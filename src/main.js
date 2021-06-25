@@ -9,20 +9,20 @@ let mainWindow;
 
 let template = [
   {
-    label: "File",
+    label: "文件",
     submenu : [
       {
         id: 'save-file',
         enabled: false,
         accelerator: "Ctrl + S",
-        label: "Save File",
+        label: "保存",
         enabled: false,
         click: async () => {
           mainWindow.webContents.send("saveFile")
         },
       },
       {
-        label: "Open File",
+        label: "打开",
         accelerator: "Ctrl + O",
         click: async () => {
           const { filePaths } = await dialog.showOpenDialog({
@@ -59,7 +59,8 @@ const createWindow = () => {
       nodeIntegration: true,
       contextIsolation: false,
       enableRemoteModule: true,
-    }
+    },
+    frame: false //隐藏自带的titleBar，使用customTitleBar
   });
 
   // and load the index.html of the app.

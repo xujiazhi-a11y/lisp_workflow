@@ -2,6 +2,13 @@ const fs = require("fs");
 const { ipcRenderer } = require("electron");
 let openedFilePath;
 const codeElm = document.getElementById("code");
+// customTitlebar
+const customTitlebar = require('custom-electron-titlebar');
+
+new customTitlebar.Titlebar({
+	backgroundColor: customTitlebar.Color.fromHex('#FFDE00'),
+    // icon: "E:/electron_Dev/pythonElectron/icon/志语.svg",
+});
 
 ipcRenderer.on("fileOpened", (event, { contents, filePath }) => {
     openedFilePath = filePath;
