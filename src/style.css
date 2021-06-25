@@ -4,6 +4,15 @@ body {
     /* background: url(images\shidizaiHead.jpg) center center no-repeat; */
 }
 
+.console-log-div {
+    border: 1px solid gray;
+    padding: 5px 10px;
+    border-radius: 5px;
+    /* width: 95% !important; */
+    background-color: rgba(34,56,78,0.7);
+    color: white;
+}
+
 textarea {
     width: 400px;
     height: 400px;
