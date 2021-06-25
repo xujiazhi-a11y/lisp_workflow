@@ -34,6 +34,7 @@ let template = [
           const contents = fs.readFileSync(file, "utf-8");
           mainWindow.webContents.send('fileOpened', {
             contents, filePath: file});
+          // 只有打开文件之后，保存文件才可以点
           const saveFileItem = menu.getMenuItemById('save-file')
           saveFileItem.enabled = true;
         },
