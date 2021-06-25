@@ -24,6 +24,8 @@ body {
 }
 
 .console-log-div {
+    position: absolute;
+    bottom: 10px;
     overflow-y: auto;
     transform: rotate(180deg);
     direction:rtl;
@@ -46,7 +48,7 @@ body {
 textarea {
     top: 0;
     width: auto;
-    height: 300px;
+    height: 100%;
 }
 
 #btn {
