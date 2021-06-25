@@ -39,8 +39,8 @@ let template = [
           saveFileItem.enabled = true;
         },
       }
-    ]
-  }
+    ]  
+  },
 ];
 
 const menu = Menu.buildFromTemplate(template);

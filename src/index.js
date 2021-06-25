@@ -7,6 +7,9 @@ const btn = document.getElementById("btn");
 const customTitlebar = require('custom-electron-titlebar');
 
 new customTitlebar.Titlebar({
+    //menuPosition: 'left',
+    // order: (title, menu),
+    titleHorizontalAlignment: 'left',
 	backgroundColor: customTitlebar.Color.fromHex('#FFDE00'),
     // icon: "E:/electron_Dev/pythonElectron/icon/志语.svg",
 });
@@ -28,11 +31,11 @@ function sendToPython() {
   
   }
 
-//   btn.addEventListener('click', () => {
-//     sendToPython();
-//   });
+  btn.addEventListener('click', () => {
+    sendToPython();
+  });
   
-//   btn.dispatchEvent(new Event('click'));
+  btn.dispatchEvent(new Event('click'));
 
 ipcRenderer.on("fileOpened", (event, { contents, filePath }) => {
     openedFilePath = filePath;
