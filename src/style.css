@@ -1,0 +1,10 @@
+body {
+    color: white;
+    text-align: center;
+    /* background: url(images\shidizaiHead.jpg) center center no-repeat; */
+}
+
+textarea {
+    width: 400px;
+    height: 400px;
+}
