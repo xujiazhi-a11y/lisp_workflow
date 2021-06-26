@@ -43,7 +43,7 @@
 
     var outer = createOuterElement();
 
-    var caption = document.createTextNode('console output');
+    var caption = document.createTextNode('');  //控制台标题
     var legend = document.createElement('legend');
     legend.appendChild(caption);
     outer.appendChild(legend);

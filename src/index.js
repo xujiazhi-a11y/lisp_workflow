@@ -10,12 +10,30 @@ new customTitlebar.Titlebar({
     //menuPosition: 'left',
     // order: (title, menu),
     titleHorizontalAlignment: 'left',
-	backgroundColor: customTitlebar.Color.fromHex('#FFDE00'),
+	backgroundColor: customTitlebar.Color.fromHex('#1E1244'),
     // icon: "E:/electron_Dev/pythonElectron/icon/志语.svg",
 });
 
-function sendToPython() {
-    let python = require('child_process').spawn('python', ['./py/hello.py', textarea.value]);
+const {PythonShell} = require('python-shell');
+
+let options = {
+    mode: 'text',
+    pythonPath: 'C:\\Users\\ThinkPad\\AppData\\Local\\Programs\\Python\\Python38\\python.exe',
+    pythonOptions: ['-u'], // get print results in real-time
+    scriptPath: 'py',
+    args: [textarea.value]
+};
+
+function sendToPythonShell() {
+  PythonShell.run('Catkins_Dream.py', options, function (err, results) {
+      if (err) throw err;
+      // results is an array consisting of messages collected during execution
+      console.log('results: %j', results);
+  });
+}
+
+function sendToPython(filePath) {
+    let python = require('child_process').spawn('python', ['./py/Catkins_Dream.py', filePath]);
     python.stdout.on('data', function (data) {
       console.log("Python response: ", data.toString('utf8'));
     //   result.textContent = data.toString('utf8');
@@ -26,16 +44,17 @@ function sendToPython() {
     });
   
     python.on('close', (code) => {
-      console.log(`child process exited with code ${code}`);
+      console.log(`子进程退出编码： ${code}`);
     });
   
   }
 
-  btn.addEventListener('click', () => {
-    sendToPython();
-  });
+btn.addEventListener('click', () => {
+  console.log(openedFilePath)
+  sendToPython(openedFilePath);
+});
   
-  btn.dispatchEvent(new Event('click'));
+btn.dispatchEvent(new Event('click'));
 
 ipcRenderer.on("fileOpened", (event, { contents, filePath }) => {
     openedFilePath = filePath;
