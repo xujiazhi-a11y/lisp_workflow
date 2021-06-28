@@ -61,7 +61,8 @@ const createWindow = () => {
       contextIsolation: false,
       enableRemoteModule: true,
     },
-    frame: false //隐藏自带的titleBar，使用customTitleBar
+    frame: false, //隐藏自带的titleBar，使用customTitleBar
+    backgroundColor: '#162834'
   });
 
   // and load the index.html of the app.
