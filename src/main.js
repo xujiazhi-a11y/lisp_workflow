@@ -1,7 +1,7 @@
 import { app, BrowserWindow, Menu} from 'electron';
 const {dialog} = require('electron');
 const fs = require("fs")
-require("electron-reload")(__dirname);
+// require("electron-reload")(__dirname);
 const ipcMain = require('electron').ipcMain
 
 // Keep a global reference of the window object, if you don't, the window will
@@ -14,10 +14,9 @@ let template = [
     submenu : [
       {
         id: 'save-file',
-        enabled: false,
+        // enabled: false,
         accelerator: "Ctrl + S",
         label: "保存",
-        enabled: false,
         click: async () => {
           mainWindow.webContents.send("saveFile")
         },

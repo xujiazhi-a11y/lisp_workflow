@@ -1,7 +1,6 @@
 const fs = require("fs");
 const { ipcRenderer } = require("electron");
-// 一开始的打开文件路径定为初始文件的路径：
-let openedFilePath = __dirname + '\\初始.txt';
+let openedFilePath = __dirname + '\\初始空白.txt';
 const codearea = document.getElementById("codearea");
 const runBtn = document.getElementById("runBtn");
 const saveNotice = document.getElementById("saveNotice")
@@ -18,7 +17,7 @@ let path
 
 //一开始初始化codearea内容为初始.txt的内容：
 function initCodearea() {
-  const initialContent = fs.readFileSync(openedFilePath, "utf-8")
+  const initialContent = fs.readFileSync(__dirname + '\\初始说明.txt', "utf-8")
   codearea.value = initialContent
 }
 initCodearea()
@@ -99,6 +98,10 @@ function sendToPython(filePath) {
   }
 
 runBtn.addEventListener('mouseup', async () => {
+  const currentCodeValue = codearea.value;
+  fs.writeFileSync(openedFilePath, currentCodeValue, "utf-8")
+  saveNotice.classList.add("active")
+  setTimeout("removeActive()", 1500);
   console.log(openedFilePath)
   sendToPython(openedFilePath);
 });
