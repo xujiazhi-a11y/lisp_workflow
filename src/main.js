@@ -2,6 +2,7 @@ import { app, BrowserWindow, Menu} from 'electron';
 const {dialog} = require('electron');
 const fs = require("fs")
 require("electron-reload")(__dirname);
+const ipcMain = require('electron').ipcMain
 
 // Keep a global reference of the window object, if you don't, the window will
 // be closed automatically when the JavaScript object is garbage collected.
@@ -79,6 +80,28 @@ const createWindow = () => {
     mainWindow = null;
   });
 };
+
+ipcMain.on('ondragstart', (event, filePath) => {
+  console.log(filePath)
+  readFile(filePath)
+  //event.sender.send('fileData', filePath)
+  //这里的readFile在尝试把filePath传给textArea，而不是文件内容
+  function readFile(filePath) {
+    event.sender.send('getFilePath', filePath)
+  }
+
+  // function readFile(filePath) {
+  //   fs.readFile(filePath, 'utf-8', (err, data) => {
+  //     if (err) {
+  //       alert ("An error occured in reading the file:" + err.message)
+  //       return
+  //     }
+
+  //     event.sender.send('fileData', data)
+  //   })
+  // }
+
+})
 
 // This method will be called when Electron has finished
 // initialization and is ready to create browser windows.

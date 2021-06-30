@@ -41,7 +41,7 @@ body {
     overflow: auto;
     transform: rotate(180deg);
     text-align: center;
-    direction:rtl;
+    direction: rtl;
     margin-top: 20px;
     border: 1px solid gray;
     padding: 5px 10px;
@@ -80,17 +80,41 @@ body {
     margin-bottom: 0 !important;
 }
 
-textarea {
-    top: 0;
-    width: auto;
-    /* height: 70vh; */
-    width: 50vw;
-    z-index: 9999999;
-    /* height: 100%; */
+.instructionDiv{
+    height: 30vh;
+    background: transparent;
+    transform-style: preserve-3d;
+    box-shadow: 20px 20px 50px rgba(0, 0, 0, 0.5);
+    transform: perspective(1000px);
+    align-content: center;
+    /* background-image: linear-gradient(#1b4253, #010e17); */
 }
 
-#btn {
+.instructionContent{
+    text-align: center;
+    color: white;
+    font-size: 12px;
+    transform: translateZ(20px)
+}
+
+#codearea {
+    position: relative;
+    top: 0;
+    width: auto;
+    width: 50vw;
+}
+
+#filePathDisplay{
+    background: transparent;
+    border: none;
+    /* font-size: 17px; */
+    color: rgba(255, 255, 255, 0.7);
+}
+
+#runBtn {
     position: absolute;
-    top: 300px;
-    background-color: chartreuse;
+    bottom: -14px;
+    right: -8px;
+    /* bottom: 0;
+    right: 0; */
 }

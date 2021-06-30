@@ -5,21 +5,33 @@
     <link rel="stylesheet" href="style.css" />
     <!-- 下面一句CDN引入yu组件库 -->
     <link rel="stylesheet" href="https://unpkg.com/yu.css.ui/dist/index.css">
+    <!-- 下面这一行其实就是为了一个运行“play”按钮的iconfont -->
+    <link rel="stylesheet" href="https://at.alicdn.com/t/font_554463_k9gdx8fkgj8m2t9.css">
+    <!-- 下面这一行是拖拽框要用的样式 -->
     <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.1.1/css/bootstrap.min.css" rel="stylesheet" 
-                integrity="sha384-WskhaSGFgHYWDcbwN70/dfYBj47jz9qbsMId/iRN3ewGhXQFZCSftd1LZCfmhktB" crossorigin="anonymous">
+          integrity="sha384-WskhaSGFgHYWDcbwN70/dfYBj47jz9qbsMId/iRN3ewGhXQFZCSftd1LZCfmhktB" crossorigin="anonymous">
   </head>
   <body>
     <!-- <h3 id="file-path"></h3> -->
     <div class="main-container">
       <div class="yu-input textarea">
-        <textarea cols="60" rows="27" id="textarea"></textarea>
+        <textarea cols="60" rows="26" id="codearea"></textarea>
+        <button id="runBtn" class="yu-button plain success default"><i class="iconfont icon-play"></i> 运行</button>
       </div>
       <div class="drag-file-container">
         <div class="jumbotron">
           <p class="alert alert-info" id="drag-file">拖动文件至此处，以获取文件绝对路径</p>
         </div>
-        <input type="text" placeholder="文件绝对路径显示："/>
-        <textarea class="instruction">说明</textarea>
+        <!-- <input type="text" placeholder="文件绝对路径显示："/> -->
+        <div class="yu-input">
+          <input id="filePathDisplay" type="text" class="suffix full" placeholder="文件绝对路径显示："/>
+          <span class="suffix">
+              <i class="iconfont icon-file-copy"></i>
+            </span>
+        </div>
+        <div class="instructionDiv" data-tilt data-tilt-glare data-tilt-max-glare="0.8">
+          <div class="instructionContent">如何输入“【】”，在中文输入法状态，直接按键盘上画着大括号、中括号的那两个键</div>
+        </div>
       </div>
     </div>
     <div class="console-log-container">
@@ -27,7 +39,6 @@
     </div>
     <!-- <p>The fieldset above will mirror <code>console.log</code> calls</p> -->
     <script src="..\console-log-div\console-log-div.js"></script>
-    <input id="btn" type="button" value="运行"></input>
     </br>
     <!-- 保存成功提示 -->
     <div class="yu-notification top-right" >
@@ -46,4 +57,5 @@
     </div>
   </body>
   <script src="index.js"></script>
+  <script type="text/javascript" src="vanilla-tilt.js"></script>
 </html>

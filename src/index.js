@@ -1,14 +1,43 @@
 const fs = require("fs");
 const { ipcRenderer } = require("electron");
 let openedFilePath;
-const textarea = document.getElementById("textarea");
-const btn = document.getElementById("btn");
+const codearea = document.getElementById("codearea");
+const runBtn = document.getElementById("runBtn");
 const saveNotice = document.getElementById("saveNotice")
 const closeSaveNotice = document.getElementById("closeSaveNotice")
+const dragFile = document.getElementById('drag-file')
+const filePathDisplay = document.getElementById('filePathDisplay')
 // 下面一句是要引入yu组件库
 // import 'yu.css.ui/dist/index.css'
 // customTitlebar
 const customTitlebar = require('custom-electron-titlebar');
+
+//拖动文件到框中，显示绝对路径
+let path
+
+dragFile.addEventListener('drop', function(e) {
+    e.preventDefault()
+    e.stopPropagation()
+
+    for(let f of e.dataTransfer.files){
+        // console.log('the files you dragged: ', f)
+        path = f.path
+    }
+
+    ipcRenderer.send('ondragstart', path)
+})
+
+dragFile.addEventListener('dragover', function (e) {
+    e.preventDefault()
+    e.stopPropagation()
+})
+
+ipcRenderer.on('getFilePath', (event, data) => {
+  // let txtarea = document.getElementById('txtarea')
+  // txtarea.innerHTML = data
+  filePathDisplay.value = data
+  console.log(data)
+})
 
 
 new customTitlebar.Titlebar({
@@ -28,7 +57,7 @@ new customTitlebar.Titlebar({
 //     pythonPath: 'C:\\Users\\ThinkPad\\AppData\\Local\\Programs\\Python\\Python38\\python.exe',
 //     pythonOptions: ['-u'], // get print results in real-time
 //     scriptPath: 'py',
-//     args: [textarea.value]
+//     args: [codearea.value]
 // };
 
 // function sendToPythonShell() {
@@ -61,16 +90,16 @@ function sendToPython(filePath) {
   
   }
 
-btn.addEventListener('mouseup', async () => {
+runBtn.addEventListener('mouseup', async () => {
   console.log(openedFilePath)
   sendToPython(openedFilePath);
 });
   
-// btn.dispatchEvent(new Event('mouseup'));
+// runBtn.dispatchEvent(new Event('mouseup'));
 
 ipcRenderer.on("fileOpened", (event, { contents, filePath }) => {
     openedFilePath = filePath;
-    document.getElementById('textarea').value = contents;
+    document.getElementById('codearea').value = contents;
 })
 
 function removeActive(){
@@ -82,7 +111,7 @@ closeSaveNotice.addEventListener('click', () => {
 })
 
 ipcRenderer.on("saveFile" , (event) => {
-    const currentCodeValue = textarea.value;
+    const currentCodeValue = codearea.value;
     fs.writeFileSync(openedFilePath, currentCodeValue, "utf-8")
     saveNotice.classList.add("active")
     setTimeout("removeActive()", 1500);
