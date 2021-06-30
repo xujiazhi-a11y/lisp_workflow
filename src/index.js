@@ -1,6 +1,7 @@
 const fs = require("fs");
 const { ipcRenderer } = require("electron");
-let openedFilePath;
+// 一开始的打开文件路径定为初始文件的路径：
+let openedFilePath = __dirname + '\\初始.txt';
 const codearea = document.getElementById("codearea");
 const runBtn = document.getElementById("runBtn");
 const saveNotice = document.getElementById("saveNotice")
@@ -14,6 +15,13 @@ const customTitlebar = require('custom-electron-titlebar');
 
 //拖动文件到框中，显示绝对路径
 let path
+
+//一开始初始化codearea内容为初始.txt的内容：
+function initCodearea() {
+  const initialContent = fs.readFileSync(openedFilePath, "utf-8")
+  codearea.value = initialContent
+}
+initCodearea()
 
 dragFile.addEventListener('drop', function(e) {
     e.preventDefault()
