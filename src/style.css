@@ -109,6 +109,7 @@ body {
     width: auto;
     width: 50vw;
     height: 74vh;
+    overflow-x: scroll;
     color: #120321;
     font-family: monospace;
     background-image: linear-gradient(#ecf3f9, #FFFAFA);

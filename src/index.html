@@ -25,9 +25,9 @@
         <!-- <input type="text" placeholder="文件绝对路径显示："/> -->
         <div class="yu-input">
           <input id="filePathDisplay" type="text" class="suffix full" placeholder="文件绝对路径显示："/>
-          <span class="suffix">
-              <i class="iconfont icon-file-copy"></i>
-            </span>
+          <span class="suffix copy" data-clipboard-target="#filePathDisplay">
+              <i class="iconfont icon-file-copy" style="cursor: pointer;"></i>
+          </span>
         </div>
         <div class="instructionDiv" data-tilt data-tilt-glare data-tilt-max-glare="0.8">
           <div class="instructionContent">如何输入“【】”，在中文输入法状态，直接按键盘上画着大括号、中括号的那两个键</div>
@@ -60,4 +60,16 @@
   </body>
   <script src="index.js"></script>
   <script type="text/javascript" src="vanilla-tilt.js"></script>
+  <script src="..\node_modules\clipboard\dist\clipboard.min.js"></script>
+  <script>
+    var clipboard = new ClipboardJS('.copy');
+
+    clipboard.on('success', function (e) {
+      console.log(e);
+    });
+
+    clipboard.on('error', function (e) {
+      console.log(e);
+    });
+  </script>
 </html>

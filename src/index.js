@@ -7,6 +7,7 @@ const saveNotice = document.getElementById("saveNotice")
 const closeSaveNotice = document.getElementById("closeSaveNotice")
 const dragFile = document.getElementById('drag-file')
 const filePathDisplay = document.getElementById('filePathDisplay')
+
 // 下面一句是要引入yu组件库
 // import 'yu.css.ui/dist/index.css'
 // customTitlebar

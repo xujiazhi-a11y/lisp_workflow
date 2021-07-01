@@ -48,6 +48,7 @@
     }
   },
   "dependencies": {
+    "clipboard": "^2.0.8",
     "console-log-div": "^0.6.3",
     "custom-electron-titlebar": "^3.2.7",
     "electron-builder": "^22.11.7",
