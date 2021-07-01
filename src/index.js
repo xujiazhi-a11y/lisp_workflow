@@ -76,7 +76,7 @@ new customTitlebar.Titlebar({
 // }
 
 function sendToPython(filePath) {
-    let python = require('child_process').spawn('python', ['./venv/py/Catkins_Dream.py', filePath]);
+    let python = require('child_process').spawn('python', ['./py/Catkins_Dream.py', filePath]);
     python.stdout.on('data', function (data) {
       console.log("Python response: ", data.toString('utf8'));
     //   result.textContent = data.toString('utf8');

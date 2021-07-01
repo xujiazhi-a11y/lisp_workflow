@@ -1,4 +1,5 @@
 import { app, BrowserWindow, Menu} from 'electron';
+import path from 'path';
 const {dialog} = require('electron');
 const fs = require("fs")
 // require("electron-reload")(__dirname);
@@ -62,7 +63,8 @@ const createWindow = () => {
       enableRemoteModule: true,
     },
     frame: false, //隐藏自带的titleBar，使用customTitleBar
-    backgroundColor: '#162834'
+    backgroundColor: '#162834',
+    icon: 'logo/zhiyu.ico'
   });
 
   // and load the index.html of the app.
@@ -88,18 +90,6 @@ ipcMain.on('ondragstart', (event, filePath) => {
   function readFile(filePath) {
     event.sender.send('getFilePath', filePath)
   }
-
-  // function readFile(filePath) {
-  //   fs.readFile(filePath, 'utf-8', (err, data) => {
-  //     if (err) {
-  //       alert ("An error occured in reading the file:" + err.message)
-  //       return
-  //     }
-
-  //     event.sender.send('fileData', data)
-  //   })
-  // }
-
 })
 
 // This method will be called when Electron has finished
