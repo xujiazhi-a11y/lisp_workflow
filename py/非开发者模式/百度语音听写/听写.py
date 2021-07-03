@@ -8,13 +8,11 @@ import os
 # Use SpeechRecognition to record 使用语音识别包录制音频  
 def 录音(rate=16000):  
     r = sr.Recognizer()  
-    with sr.Microphone(sample_rate=rate) as source:  
-        print("开始说话吧：")  
+    with sr.Microphone(sample_rate=rate) as source:    
         audio = r.listen(source)  
     wav_num = 0
     with open(f"00{wav_num}.wav", "wb") as f:  
         f.write(audio.get_wav_data())  
-        print("录音完成！")
     # wav_num = wav_num + 1  
   
 # 录音() 

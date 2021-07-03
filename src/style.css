@@ -28,6 +28,7 @@ body {
 }
 
 #console-log-text{
+    overflow-x: hidden;
     transform: rotate(180deg);
     bottom: 0;
     overflow-y: auto;
@@ -38,7 +39,8 @@ body {
     /* position: absolute;
     bottom: 10px; */
     /* margin-left: 30px !important; */
-    overflow: auto;
+    overflow-y: auto;
+    overflow-x: hidden;
     transform: rotate(180deg);
     text-align: center;
     direction: rtl;

@@ -4,19 +4,51 @@ import re
 import os
 import operator
 import psutil
+import itertools
+import math
 # import ffmpeg
 import sys
+import pypinyin
 from 非开发者模式 .包不存在 import 包不存在
 from 非开发者模式 .包含中文 import 包含中文
 from 非开发者模式 .倒计时 import 倒计时
 from 非开发者模式 .是合法的时间格式 import 是合法的时间格式
 from 非开发者模式 .将ffmpeg注入临时环境变量 import 将ffmpeg注入临时环境变量
 from 非开发者模式 .执行快捷键指令并给出温馨提示 import 执行快捷键指令并给出温馨提示
+from 非开发者模式 .字符串中最末出现的文件大小对应的字节数 import 字符串中最末出现的文件大小对应的字节数
 from 非开发者模式 .百度语音听写 .听写 import 返回说出的内容, 录音
 from 非开发者模式 .路径字典 import b站内容名字对应路径字典, 爱奇艺内容名字对应路径字典, 落霞小说鲲弩小说路径字典
 
+def 各种大小写组合(字符串):
+    组合列表 =list(map(''.join, itertools.product(*((字母.upper(), 字母.lower()) for 字母 in 字符串))))
+    return 组合列表
+
+def 字符串中的整数(字符串):
+    return int(''.join(元素 for 元素 in 字符串 if 元素.isdigit()))
+
+def 使用用户友好的文件大小单位(bytes, units=[' bytes','KB','MB','GB','TB', 'PB', 'EB']):
+    """ Returns a human readable string representation of bytes """
+    return str(bytes) + units[0] if bytes < 1024 else 使用用户友好的文件大小单位(bytes>>10, units[1:])
+
+def 文件大小(文件路径):
+    文件字节数 = os.path.getsize(文件路径) 
+    return 使用用户友好的文件大小单位(文件字节数)
+
+def 转字节数(文件大小字符串):
+    if 文件大小字符串.rfind('KB') != -1 or 文件大小字符串.rfind('kb') != -1:
+        return int(文件大小字符串.rsplit('KB')[0].rsplit('kb')[0]) * 1024
+    if 文件大小字符串.rfind('MB') != -1 or 文件大小字符串.rfind('mb') != -1:
+        return int(文件大小字符串.rsplit('MB')[0].rsplit('mb')[0]) * 1024 * 1024
+    if 文件大小字符串.rfind('GB') != -1 or 文件大小字符串.rfind('gb') != -1:
+        return int(文件大小字符串.rsplit('GB')[0].rsplit('gb')[0]) * 1024 * 1024 * 1024
+    if 文件大小字符串.rfind('TB') != -1 or 文件大小字符串.rfind('tb') != -1:
+        return int(文件大小字符串.rsplit('TB')[0].rsplit('tb')[0]) * 1024 * 1024 * 1024 * 1024
+
 def 文件名(文件):
     return 文件.rsplit("\\",1)[1]
+
+def 不带后缀文件名(文件):
+    return (文件.rsplit("\\",1)[1]).rsplit(".", 1)[0]
 
 def 后缀名(文件):
     return 文件.rsplit(".",1)[1]
@@ -30,11 +62,13 @@ def 所处路径相同(文件路径列表):
 def 后缀相同(文件列表):
     return(all(后缀名(文件) == 后缀名(文件列表[0]) for 文件 in 文件列表))
 
+def 拼音(汉字字符串):
+    无分隔拼音=pypinyin.slug(汉字字符串,separator="")
+    return 无分隔拼音
+
 def 根据内容名字打开网页(内容名字,字典):
     for key in 字典.keys():
-        #print(key)
         if 内容名字 in key:
-            #print(key)
             webbrowser.open(字典[key])
 
 def 执行下载(视频网址):
@@ -60,13 +94,26 @@ def 更新pip():
     exec('pip install -i https://pypi.tuna.tsinghua.edu.cn/simple pip -U')
 
 def 执行非开发者模式语句(指令表达式):
-    if ('中国' in 指令表达式[0] or '中华' in 指令表达式) and '传统' in 指令表达式[0] and '颜色' in 指令表达式[0]:
+    if '文件大小' in 指令表达式[0]:
+        #可以设计成可输入一串文件，看似健壮性会高些？但真的有人会这么干吗？
+        多文件路径列表 = 指令表达式[1:]
+        for 文件 in 多文件路径列表:
+            print(文件大小(文件))
+    elif ('中国' in 指令表达式[0] or '中华' in 指令表达式) and '传统' in 指令表达式[0] and '颜色' in 指令表达式[0]:
         webbrowser.open('https://github.com/yourtion/30dayMakeOS') 
-    elif (指令表达式[0] == '播放' or 指令表达式[0] == '阅读') and  len(指令表达式) == 2:
+    elif 指令表达式[0] == '播放' and  len(指令表达式) == 2:
         内容名字 = 指令表达式[1]
         根据内容名字打开网页(内容名字,b站内容名字对应路径字典)
         根据内容名字打开网页(内容名字,爱奇艺内容名字对应路径字典)
-        根据内容名字打开网页(内容名字,落霞小说鲲弩小说路径字典) 
+    elif 指令表达式[0] == '阅读' and len(指令表达式) == 2:
+        书名 = 指令表达式[1]
+        # https://www.kunnu.com/santi/#santi-1
+        对应鲲弩网址 = 'https://www.kunnu.com/' + 拼音(书名)
+        webbrowser.open(对应鲲弩网址)
+    elif '播放' in 指令表达式[0] and '歌' in 指令表达式[0] and  len(指令表达式) == 2:
+        歌名 = 指令表达式[1]
+        对应MyFreeMp3网址 = 'http://tool.liumingye.cn/music/?page=audioPage&type=migu&name=' + 歌名
+        webbrowser.open(对应MyFreeMp3网址)
     elif 指令表达式[0] == '下载' and len(指令表达式) == 2:
         更新pip()
         视频下载链接 = 指令表达式[1]
@@ -198,15 +245,77 @@ def 执行非开发者模式语句(指令表达式):
         合并指令 = 'ffmpeg' + ' ' + '-f' + ' ' + 'concat' + ' ' + '-i' + ' ' + '音视频顺序文件.txt' + ' ' + '-c' + ' ' + 'copy' + ' ' + 志语合并的媒体文件名 + '.' + 后缀名(音视频文件列表[0]) 
         os.system(合并指令)
         print('合好的音视频文件在它们的所共同在的文件夹中，名字是'+'“'+志语合并的媒体文件名+'.'+后缀名(音视频文件列表[0])+'”'+':')
+        # 都处理完以后，返回本路径
+        os.chdir(os.getcwd())  #这样写对吗？
+    elif "分辨率" in 指令表达式[0] or "画质" in 指令表达式[0] or '降为' in 指令表达式[0]:
+        将ffmpeg注入临时环境变量()
+        原视频路径 = 指令表达式[1]  
+        os.chdir(所处路径(原视频路径))
+        常用分辨率字典 = {'4K':'3840:2160','2K':'2560:1440','1080P':'1920:1080','720P':'1280:720','480P':'640:480','360P':'480:360' }
+        键入了合法的转后分辨率 = False
+        for 分辨率 in 常用分辨率字典.keys():
+            if 指令表达式[0].rfind(分辨率) != -1 or 指令表达式[0].rfind(分辨率) != -1:
+                键入了合法的转后分辨率 = True
+                显示分辨率 = 常用分辨率字典[分辨率]
+                新视频路径 = 不带后缀文件名(原视频路径) + 分辨率 + '.' + 后缀名(原视频路径)
+            #这里是不是应该加个用户输入的分辨率没在字典中的情况？
+        if 键入了合法的转后分辨率:  
+            降低分辨率命令 = 'ffmpeg' + ' ' + '-i' + ' ' + 原视频路径 + ' ' + '-vf' + ' ' + 'scale=' + 显示分辨率 + ' ' + 新视频路径
+            print(降低分辨率命令)
+            os.system(降低分辨率命令)
+            os.chdir(os.getcwd()) 
+        # 下面是针对降为固定大小，使用将长宽线数均降低
+        else:
+            要求的文件字节量 =  字符串中最末出现的文件大小对应的字节数(指令表达式[0])
+            print('要求的文件字节量')
+            print(要求的文件字节量)
+            原文件字节量 =  os.path.getsize(原视频路径)
+            print('原文件字节量:')
+            print(原文件字节量)
+            # 实测iw/3,ih/3，视频大小缩小倍数约为3倍（而非想象中的9倍），iw/2，ih/2，视频大小缩小倍数约为2倍，而非想象中的4倍
+            缩小倍数 = 原文件字节量 / 要求的文件字节量
+            print(缩小倍数)
+            #测试一下写死的命令，看会缩小多少
+            新视频路径 = 不带后缀文件名(原视频路径) + '_s' + '.' + 后缀名(原视频路径)
+            压缩大小命令 = 'ffmpeg' + ' ' + '-i' + ' ' + 文件名(原视频路径) + ' ' + '-vf' + ' ' + '\"' + 'scale=trunc(iw/(2*' + str(缩小倍数) + '))*2:trunc(ih/(2*' + str(缩小倍数) + '))*2' + '\"' + ' ' + 新视频路径
+            print(压缩大小命令)
+            os.system(压缩大小命令)
     elif "百度" in 指令表达式[0] and "语音" in 指令表达式[0]:
         语音识别代码 = 指令表达式[1:]
-        print(语音识别代码)
-        print(语音识别代码[0])
-    elif "分辨率" in 指令表达式[0] or "画质" in 指令表达式[0]:
-        常用分辨率字典 = {'4K':'3840:2160','2K':'2560:1440','1080P':'1920:1080','720P':'1280:720','480P':'640:480','360P':'' }
-        for 分辨率 in 常用分辨率列表:
-            if 分辨率 in 指令表达式[0] or 分辨率.lower() in 指令表达式[0]:
-                pass
+        # 先从代码块中找寻appID等三个值的定义，【appid appid】这样来定义三个所需值
+        # APP_ID, API_KEY, SECRET_KEY
+        for 语句 in 语音识别代码:
+            if any(大小写组合 in 语句[0] for 大小写组合 in 各种大小写组合("appID")):
+                APP_ID = str(语句[1])
+            elif any(大小写组合 in 语句[0] for 大小写组合 in 各种大小写组合("APP_ID")):
+                APP_ID = str(语句[1])
+            elif any(大小写组合 in 语句[0] for 大小写组合 in 各种大小写组合("apiKEY")):
+                API_KEY = str(语句[1])
+            elif any(大小写组合 in 语句[0] for 大小写组合 in 各种大小写组合("API_KEY")):
+                API_KEY = str(语句[1])
+            elif any(大小写组合 in 语句[0] for 大小写组合 in 各种大小写组合("secretKEY")):
+                SECRET_KEY = str(语句[1])
+            elif any(大小写组合 in 语句[0] for 大小写组合 in 各种大小写组合("SECRET_KEY")):
+                SECRET_KEY = str(语句[1])
+        # print(语音识别代码)
+        # 下面这一句起语音识别
+        # 为啥没有直接显示开始录音？我现在把录音拆出来试试
+        # 说出的内容 = 返回说出的内容('24449406', 'pIFYzT039XeeBynO5pyleO1Z', 'pxaRaOYVhr26iSa4aiTYGCrsF9EH4WrT') 
+        说出的内容  = 返回说出的内容(APP_ID, API_KEY, SECRET_KEY)
+        # 下面一句写死一个说出的内容以测试
+        # 说出的内容 = "播放你的名字"
+        for 语音识别语句 in 语音识别代码:
+            # print(语音识别语句)
+            if "如果" in 语音识别语句[0]:
+                条件 = 语音识别语句[1]
+                执行命令 = 语音识别语句[2]
+                if "含" in 条件[0]:
+                    关键字列表 = 条件[1:]
+                    if all(关键字 in 说出的内容 for 关键字 in 关键字列表):
+                        print(执行命令)
+                        执行非开发者模式语句(执行命令)
+                    # print(关键字列表)
+
 
 
 
