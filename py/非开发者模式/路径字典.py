@@ -43,3 +43,22 @@ b站内容名字对应路径字典 = {'你的名字电影b站链接':'https://ww
                            '三体':'https://www.kunnu.com/santi/',
                            '球状闪电':'https://www.kunnu.com/qiuzhuangshandian/'}
 
+b站优质课程对应路径字典 = {'高数':'https://www.bilibili.com/video/BV1ev411z7sv?from=search&seid=3419501287332133767',
+                          '高等数学':'https://www.bilibili.com/video/BV1ev411z7sv?from=search&seid=3419501287332133767',
+                          '现代':'https://www.bilibili.com/video/BV1oK4y1u7t1?from=search&seid=8644051630816663242',
+                          '线性代数':'https://www.bilibili.com/video/BV1oK4y1u7t1?from=search&seid=8644051630816663242',
+                          '考研政治':'https://www.bilibili.com/video/BV1e7411w7d4?from=search&seid=14211432035023341310',
+                          '马原':'https://www.bilibili.com/video/BV1e7411w7d4?from=search&seid=14211432035023341310',
+                          '毛概':'https://www.bilibili.com/video/BV1e7411w7d4?from=search&seid=14211432035023341310',
+                          '汇编':'https://www.bilibili.com/video/BV1Rs411c7HG?from=search&seid=1855963396321579522',
+                          '计网':'https://www.bilibili.com/video/BV19E411D78Q?from=search&seid=11818358027245155995',
+                          '计算机网络':'https://www.bilibili.com/video/BV19E411D78Q?from=search&seid=11818358027245155995',
+                          '计组':'https://www.bilibili.com/video/BV1BE411D7ii?from=search&seid=11818358027245155995',
+                          '计算机组成原理':'https://www.bilibili.com/video/BV1BE411D7ii?from=search&seid=11818358027245155995',
+                          '操作系统':'https://www.bilibili.com/video/BV1YE411D7nH?from=search&seid=11818358027245155995',
+                          '考研英语':'https://www.bilibili.com/video/BV1ot4y1z7nX?from=search&seid=16533537798999856229',
+                          'AE':'https://www.bilibili.com/video/BV1dx411D7As?from=search&seid=14404717729403314492'
+                          
+
+}
+

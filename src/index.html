@@ -31,6 +31,8 @@
         </div>
         <div class="instructionDiv" data-tilt data-tilt-glare data-tilt-max-glare="0.8">
           <div class="instructionContent">如何输入“【】”，在中文输入法状态，直接按键盘上画着大括号、中括号的那两个键</div>
+          <div class="instructionContent">你能接受这种交互形式吗？“志语”有帮助你解决些许问题吗？</div>
+          <div class="instructionContent">如遇到任何使用问题，或你有任何改进建议，欢迎投递至下面的两个邮箱（任意之一）。</div>
           <div class="mail">zhiyucomiler@163.com</div>
           <div class="mail">Catkins_Dream@163.com</div>
         </div>       
@@ -42,6 +44,17 @@
     <!-- <p>The fieldset above will mirror <code>console.log</code> calls</p> -->
     <script src="..\console-log-div\console-log-div.js"></script>
     </br>
+    <!-- 命令执行成功相关说明弹框，提高交互感 --> 
+    <div class="yu-dialog hidden" id="messageDialog">
+      <div class="wrapper">
+        <div class="header"><i class="iconfont icon-close"></i></div>
+        <div class="content" id="messageDialogContent"></div>
+        <!-- <div class="other"></div> -->
+        <div class="button">
+          <button class="yu-button primary">确认</button>
+        </div>
+      </div>
+    </div>   
     <!-- 保存成功提示 -->
     <div class="yu-notification top-right" >
       <div id="saveNotice" class="notice">

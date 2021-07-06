@@ -7,11 +7,13 @@ const saveNotice = document.getElementById("saveNotice")
 const closeSaveNotice = document.getElementById("closeSaveNotice")
 const dragFile = document.getElementById('drag-file')
 const filePathDisplay = document.getElementById('filePathDisplay')
-
+const messageDialog = document.getElementById('messageDialog')
+const messageDialogContent = document.getElementById('messageDialogContent')
 // 下面一句是要引入yu组件库
 // import 'yu.css.ui/dist/index.css'
 // customTitlebar
 const customTitlebar = require('custom-electron-titlebar');
+const { contextId } = require("process");
 
 //拖动文件到框中，显示绝对路径
 let path
@@ -76,10 +78,32 @@ new customTitlebar.Titlebar({
 //   });
 // }
 
+
+// 这里是对于某个操作结束时出现的消息弹框，去除hidden，开始显示
+function removeHidden() {
+  messageDialog.classList.remove("hidden")
+}
+
+function addHidden() {
+  messageDialog.classList.add('hidden')
+}
+
+function displayMessageBox(pythonResponse) {
+  if (pythonResponse.indexOf('合好的音视频文件') !== -1) {
+    messageDialogContent.innerHTML = '合并成功！'
+    removeHidden()
+    setTimeout('addHidden()', 1500)
+  }
+}
+
 function sendToPython(filePath) {
     let python = require('child_process').spawn('python', ['./py/Catkins_Dream.py', filePath]);
     python.stdout.on('data', function (data) {
       console.log("Python response: ", data.toString('utf8'));
+      let pythonResponse = data.toString('utf8')
+      // console.log('python返回值：')
+      // console.log(pythonResponse);
+      displayMessageBox(pythonResponse)
     //   result.textContent = data.toString('utf8');
     });
   
@@ -98,6 +122,8 @@ function sendToPython(filePath) {
   
   }
 
+
+
 runBtn.addEventListener('mouseup', async () => {
   const currentCodeValue = codearea.value;
   fs.writeFileSync(openedFilePath, currentCodeValue, "utf-8")
@@ -114,6 +140,7 @@ ipcRenderer.on("fileOpened", (event, { contents, filePath }) => {
     document.getElementById('codearea').value = contents;
 })
 
+// 这里是对于保存成功提示去除active，取消显示
 function removeActive(){
   saveNotice.classList.remove("active")
 }
@@ -128,3 +155,50 @@ ipcRenderer.on("saveFile" , (event) => {
     saveNotice.classList.add("active")
     setTimeout("removeActive()", 1500);
 })
+
+// // 这里是对于某个操作结束时出现的消息弹框，去除hidden，开始显示
+// function removeHidden() {
+//   messageDialog.classList.remove("hidden")
+// }
+
+// function addHidden() {
+//   messageDialog.classList.add('hidden')
+// }
+
+// // 选择需要观察变动的节点
+// const consoleLogText = document.getElementById('console-log-text');
+
+// // 观察器的配置（需要观察什么变动）
+// const config = { attributes: true, childList: true, subtree: true };
+
+// // 当观察到变动时执行的回调函数
+// const callback = function(mutationsList, observer) {
+//     // Use traditional 'for loops' for IE 11
+//     // 注意下面不能出现console.log否则会导致死循环
+//     for(let mutation of mutationsList) {
+//         if (mutation.type === 'childList') {
+//             let lines = consoleLogText.innerHTML.split("\n");
+//             // alert(lines)
+//             // 文字内容的最后一行在lines.length - 2位置处，最后面的一行是空白
+//             let lastLine = lines[lines.length - 2];
+//             if (lines.indexOf('合好的音视频文件') != -1) {
+//               // alert('合并完成！')
+//               messageDialogContent = '合并完成！'
+//               removeHidden()
+//               setTimeout('addHidden()', 1000)
+//             }
+//         }
+//         else if (mutation.type === 'attributes') {
+//             alert('The ' + mutation.attributeName + ' attribute was modified.');
+//         }
+//     }
+// };
+
+// // 创建一个观察器实例并传入回调函数
+// const observer = new MutationObserver(callback);
+
+// // 以上述配置开始观察目标节点
+// observer.observe(consoleLogText, config);
+
+// // 之后，可停止观察
+// // observer.disconnect(); 

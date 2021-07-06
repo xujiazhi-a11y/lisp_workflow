@@ -108,10 +108,10 @@ body {
 #codearea {
     position: relative;
     top: 0;
-    width: auto;
+    /* width: auto; */
     width: 50vw;
     height: 74vh;
-    overflow-x: scroll;
+    overflow-x: auto;
     color: #120321;
     font-family: monospace;
     background-image: linear-gradient(#ecf3f9, #FFFAFA);
@@ -123,6 +123,10 @@ body {
     border: none;
     /* font-size: 17px; */
     color: rgba(255, 255, 255, 0.7);
+}
+
+.hidden{
+    display: none;
 }
 
 #runBtn {
