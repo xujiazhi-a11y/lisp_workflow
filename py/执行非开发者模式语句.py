@@ -84,14 +84,16 @@ def 建文件夹(文件夹名):
 def 更新pip():
     os.system('pip install -i https://pypi.tuna.tsinghua.edu.cn/simple --upgrade pip')
 
+原路径 = os.getcwd()
+
 def 执行非开发者模式语句(指令表达式):
     if '文件大小' in 指令表达式[0]:
         #可以设计成可输入一串文件，看似健壮性会高些？但真的有人会这么干吗？
         多文件路径列表 = 指令表达式[1:]
         for 文件 in 多文件路径列表:
             print(文件大小(文件))
-    elif ('中国' in 指令表达式[0] or '中华' in 指令表达式) and '传统' in 指令表达式[0] and '颜色' in 指令表达式[0]:
-        webbrowser.open('https://github.com/yourtion/30dayMakeOS')
+    elif ('中国' in 指令表达式[0] or '中华' in 指令表达式[0]) and '传统' in 指令表达式[0] and '颜色' in 指令表达式[0]:
+        webbrowser.open('https://colors.ichuantong.cn/')
     elif '壁纸' in 指令表达式[0] and '动态' not in 指令表达式[0]:
         webbrowser.open('http://lab.mkblog.cn/wallpaper/')
     elif '桌面背景' in 指令表达式[0] and '动态' not in 指令表达式[0]:
@@ -207,35 +209,6 @@ def 执行非开发者模式语句(指令表达式):
             剪切指令 = 'ffmpeg' + ' ' + '-ss' + ' ' + 起始时间 + ' ' + '-to' + ' ' + 终止时间 + ' ' + '-i' + ' ' + 欲剪文件路径 + ' ' + '-c' + ' ' + 'copy' + ' ' + 输出文件路径
             os.system(剪切指令)
             print("剪过的音视频文件在原文件所在的文件夹里（原路径下），在文件名结尾加了一个CUT")
-    # elif '合并' in 指令表达式[0]:
-    #     将ffmpeg注入临时环境变量()
-    #     音视频文件列表 = 指令表达式[1:]
-    #     if 后缀相同(音视频文件列表) == False:
-    #         raise TypeError('你给的文件类型不都相同（后缀没有全一样），可能只能合并同类的文件啊~，本软件支持类型转换，可以先把它们转为同一类型的文件后再合并')
-    #     if 所处路径相同(音视频文件列表):
-    #         os.chdir(所处路径(音视频文件列表[0]))
-    #     elif 所处路径相同(音视频文件列表) == False:
-    #         raise ValueError('你给的媒体文件没在同一文件夹下，需要挪到同一文件夹下。。。这样你也好整理不是吗？')
-    #     with open(f"音视频顺序文件.txt", "wb") as f:
-    #         for 每条音视频 in 指令表达式[1:]:
-    #             f.write(('file' + ' ').encode())
-    #             f.write((文件名(每条音视频) + '\n').encode())  #这里需要调一个encode方法，否则会报类型错
-    #     志语合并的媒体文件名 = '志语合并的媒体文件1'
-    #     该目录下的文件列表 = os.listdir(所处路径(音视频文件列表[0]))
-    #     for 文件 in 该目录下的文件列表:
-    #         if '志语合并的媒体文件10' in 文件:
-    #             raise ValueError('当前文件夹下合并后未改名的文件太多啦，已经不方便整理了。')
-    #         for 序号 in range(9, 0, -1):
-    #             if '志语合并的媒体文件' + str(序号) in 文件:
-    #                 志语合并的媒体文件名 = '志语合并的媒体文件' + str(序号 + 1)
-    #                 break
-    #     合并指令 = 'ffmpeg' + ' ' + '-f' + ' ' + 'concat' + ' ' + '-safe' + ' ' + '0' + ' ' + '-i' + ' ' + '音视频顺序文件.txt' + ' ' + '-c' + ' ' + 'copy' + ' ' + 志语合并的媒体文件名 + '.' + 后缀名(音视频文件列表[0]) 
-    #     subprocess.Popen(合并指令,shell = True).wait()
-    #     # os.system(合并指令)
-    #     time.sleep(0.1)
-    #     print('合好的音视频文件在它们的所共同在的文件夹中，名字是'+'“'+志语合并的媒体文件名+'.'+后缀名(音视频文件列表[0])+'”'+':')
-    #     # # 都处理完以后，返回本路径
-    #     # os.chdir(os.getcwd())  #这样写对吗？
     elif '合并' in 指令表达式[0]:
         将ffmpeg注入临时环境变量()
         音视频文件列表 = 指令表达式[1:]
@@ -290,8 +263,57 @@ def 执行非开发者模式语句(指令表达式):
                 志语合并的文件名 = 'ZhiYu_MP4_HeBing' + str(合并文件序号) + '.mp4' 
             合并指令 = 合并指令 + '\" -c copy -bsf:a aac_adtstoasc -movflags +faststart ' + 所处路径(音视频文件列表[0]) + '\\' + 志语合并的文件名
             subprocess.Popen(合并指令, shell = True).wait()
+            print('合好的文件和你输入的第一个文件在同一文件夹下，文件名以ZhiYu_MP4_HeBing开头')
         # 都处理完以后，返回本路径
-        os.chdir(os.getcwd())  #这样写对吗？
+        os.chdir(原路径)  #这样写对吗？
+    elif "批量截图" in 指令表达式[0]:
+        将ffmpeg注入临时环境变量()
+        (_, 每秒几帧, 视频路径) = 指令表达式
+        帧数匹配 = re.search(r'\d+', 每秒几帧)
+        #需要用group函数加上强转，把search返回的re.match类型转为int型
+        每秒帧数 = int(帧数匹配.group())
+        os.chdir(所处路径(视频路径))
+        if not os.path.exists('./ZhiYu_JieTu'):
+            os.mkdir('ZhiYu_JieTu')
+        批量截图指令 = 'ffmpeg -i ' + 视频路径 + ' -r ' + str(每秒帧数) + ' ZhiYu_JieTu/' + 不带后缀文件名(视频路径) + '%03d' + '.png'
+        # 批量截图指令 = 'ffmpeg -i ' + 视频路径 + ' -r ' + str(每秒帧数) + ' frames/frame%03d.png'
+        print(批量截图指令)
+        subprocess.Popen(批量截图指令, shell = True).wait()
+        print('截图文件在ZhiYu_JieTu文件夹中')
+        os.chdir(原路径)
+    elif "提取音频" in 指令表达式[0]:
+        将ffmpeg注入临时环境变量()
+        (_, 视频路径) = 指令表达式
+        os.chdir(所处路径(视频路径))
+        提取音频指令 = 'ffmpeg -i ' + 视频路径 + ' -vn ' + 不带后缀文件名(视频路径) + '_YinPin.mp3'
+        subprocess.Popen(提取音频指令, shell = True).wait()
+        print('音频文件同视频文件在一个文件夹中，文件名为视频文件后面加上“_YinPin”，格式为MP3')
+        os.chdir(原路径)
+    elif '添加背景音乐' in 指令表达式[0] or '添加音频' in 指令表达式[0]:
+        将ffmpeg注入临时环境变量()
+        视频和音频 = 指令表达式[1:]
+        常用视频格式 = ['mp4','flv','avi','mov','wmv','m4v','f4v','3gp','ts','webm']
+        常用音频格式 = ['aac','m4a','wma','ac3','mp3','flac','ogg']
+        视频文件 = ''
+        音频文件 = ''
+        # 应该添加判断是合法的媒体文件格式的代码吧
+        for 媒体文件 in 视频和音频:
+            for 视频格式 in 常用视频格式:
+                if 后缀名(媒体文件) == 视频格式:
+                    视频文件 = 媒体文件
+            for 音频格式 in 常用音频格式:
+                if 后缀名(媒体文件) == 音频格式:
+                    音频文件 = 媒体文件
+        if 视频文件 == '':
+            raise TypeError('添加背景音乐时没有输入能处理的视频文件。。。')
+        if 音频文件 == '':
+            raise TypeError('添加背景音乐时没有输入能处理的音频文件。。。')
+        os.chdir(所处路径(视频文件))   
+        合成指令 = 'ffmpeg -i ' + 视频文件 + ' -i ' + 音频文件 + ' -filter_complex "[0:a][1:a]amerge=inputs=2[a]" -map 0:v -map "[a]" -c:v copy -ac 2 -shortest ' + 不带后缀文件名(视频文件) + '_' + 不带后缀文件名(音频文件) + '.' + 后缀名(视频文件) 
+        print(合成指令)
+        subprocess.Popen(合成指令, shell = True).wait() 
+        print('添加好音频的视频文件和原视频文件在同一文件夹下，名字是在原视频名字后面加上了你输入的音频的名字')
+        os.chdir(原路径)
     elif "分辨率" in 指令表达式[0] or "画质" in 指令表达式[0] or '降为' in 指令表达式[0]:
         将ffmpeg注入临时环境变量()
         原视频路径 = 指令表达式[1]  
@@ -389,5 +411,7 @@ def 执行非开发者模式语句(指令表达式):
     elif '翻译' in 指令表达式[0]:
         执行快捷键指令并给出温馨提示("alt+esc","")
         执行快捷键指令并给出温馨提示("ctrl+alt+f", '如果有安装qq的话，windows系统下qq框选屏幕翻译的快捷键是ctrl+alt+f，如日后常有需要，可以记一下喽~')
+
+
     
           
