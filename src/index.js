@@ -99,7 +99,7 @@ function displayMessageBox(pythonResponse) {
 function sendToPython(filePath) {
     let python = require('child_process').spawn('python', ['./py/Catkins_Dream.py', filePath]);
     python.stdout.on('data', function (data) {
-      console.log("Python response: ", data.toString('utf8'));
+      console.log("絮梦1.0 >>>", data.toString('utf8'));
       let pythonResponse = data.toString('utf8')
       // console.log('python返回值：')
       // console.log(pythonResponse);

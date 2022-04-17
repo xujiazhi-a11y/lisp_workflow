@@ -17,9 +17,9 @@ def 录音(rate=16000):
   
 # 录音() 
 
-APP_ID = '24449406'  
-API_KEY = 'pIFYzT039XeeBynO5pyleO1Z'  
-SECRET_KEY = 'pxaRaOYVhr26iSa4aiTYGCrsF9EH4WrT'  
+APP_ID = '25989514'  
+API_KEY = 'ZnLgb47K5NennuMXo7L7wzvK'  
+SECRET_KEY = 'sYfFO7GMVKMnGLULw5Cih60a8NqqZbGX'  
 client = AipSpeech(APP_ID, API_KEY, SECRET_KEY)  
 path = '000.wav'  
   
