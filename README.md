@@ -49,6 +49,7 @@
 <img src="https://gitee.com/jiafaCompiler/blog-editor/raw/master/upload/%E9%9D%9E%E5%BC%80%E5%8F%91%E8%80%85%E6%A8%A1%E5%BC%8F-%E6%99%BA%E8%83%BD%E8%AF%AD%E9%9F%B3%E5%8A%A9%E6%89%8B-%E6%89%A7%E8%A1%8C%E7%BB%93%E6%9E%9C.png" width=80% />
 </div>
 <p align="center"> 图3.13 非开发者模式-智能语音助手-执行结果 </p>
+
 ### 3.2 开发者模式案例
 
 “开发者模式”主在用汉化lisp语言实现一些工程、算法过程，完成对语言能力的进一步扩展。
