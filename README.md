@@ -24,12 +24,12 @@
 用户可以通过输入“【转为某某格式 文件存储地址】”，而后点击“运行”的方式完多媒体文件的格式转换，支持绝大部分多媒体文件格式，此功能可有效帮助到工作流中会涉及多媒体文件处理的人。所要输入的代码和程序执行效果如下面的图3.10、图3.11所示：
 
 <div align=center>
-<img src="https://gitee.com/jiafaCompiler/blog-editor/raw/master/upload/%E9%9D%9E%E5%BC%80%E5%8F%91%E8%80%85%E6%A8%A1%E5%BC%8F-%E8%A7%86%E9%A2%91%E4%B8%8B%E8%BD%BD-%E6%89%A7%E8%A1%8C%E7%BB%93%E6%9E%9C.png" width=80% />
+<img src="https://gitee.com/jiafaCompiler/blog-editor/raw/master/upload/%E9%9D%9E%E5%BC%80%E5%8F%91%E8%80%85%E6%A8%A1%E5%BC%8F-%E6%A0%BC%E5%BC%8F%E8%BD%AC%E6%8D%A2-%E8%BE%93%E5%85%A5%E4%BB%A3%E7%A0%81.png" width=80% />
 </div>
 <p align="center"> 图3.10 非开发者模式-格式转换-输入代码 </p>
 
 <div align=center>
-<img src="https://gitee.com/jiafaCompiler/blog-editor/raw/master/upload/%E9%9D%9E%E5%BC%80%E5%8F%91%E8%80%85%E6%A8%A1%E5%BC%8F-%E8%A7%86%E9%A2%91%E4%B8%8B%E8%BD%BD-%E6%89%A7%E8%A1%8C%E7%BB%93%E6%9E%9C.png" width=80% />
+<img src="https://gitee.com/jiafaCompiler/blog-editor/raw/master/upload/%E9%9D%9E%E5%BC%80%E5%8F%91%E8%80%85%E6%A8%A1%E5%BC%8F-%E6%A0%BC%E5%BC%8F%E8%BD%AC%E6%8D%A2-%E6%89%A7%E8%A1%8C%E7%BB%93%E6%9E%9C.png" width=80% />
 </div>
 <p align="center"> 图3.11 非开发者模式-格式转换-执行结果 </p>
 
@@ -39,12 +39,12 @@
 用户可以通过输入“【百度语音听写 【APP_ID （APP_ID）】【API_KEY（API_KEY）】【SECRET_KEY （SECRET_KEY）】（语音命令式操作）】”就能完成一个简单的语音识别助手，现在可以实现用语音控制方式帮用户完成录屏、截屏、屏幕文字识别、播放具体视频、播放具体音频、看某某小说等等操作。实现成本（代码量）相对较低。所要输入的代码和程序执行效果如下面的图3.12、图3.13所示：
 
 <div align=center>
-<img src="https://gitee.com/jiafaCompiler/blog-editor/raw/master/upload/%E9%9D%9E%E5%BC%80%E5%8F%91%E8%80%85%E6%A8%A1%E5%BC%8F-%E8%A7%86%E9%A2%91%E4%B8%8B%E8%BD%BD-%E6%89%A7%E8%A1%8C%E7%BB%93%E6%9E%9C.png" width=80% />
+<img src="https://gitee.com/jiafaCompiler/blog-editor/raw/master/upload/%E9%9D%9E%E5%BC%80%E5%8F%91%E8%80%85%E6%A8%A1%E5%BC%8F-%E6%99%BA%E8%83%BD%E8%AF%AD%E9%9F%B3%E5%8A%A9%E6%89%8B-%E8%BE%93%E5%85%A5%E4%BB%A3%E7%A0%81.jpg" width=80% />
 </div>
 <p align="center"> 图3.12 非开发者模式-智能语音助手-输入代码 </p>
 
 <div align=center>
-<img src="https://gitee.com/jiafaCompiler/blog-editor/raw/master/upload/%E9%9D%9E%E5%BC%80%E5%8F%91%E8%80%85%E6%A8%A1%E5%BC%8F-%E8%A7%86%E9%A2%91%E4%B8%8B%E8%BD%BD-%E6%89%A7%E8%A1%8C%E7%BB%93%E6%9E%9C.png" width=80% />
+<img src="https://gitee.com/jiafaCompiler/blog-editor/raw/master/upload/%E9%9D%9E%E5%BC%80%E5%8F%91%E8%80%85%E6%A8%A1%E5%BC%8F-%E6%99%BA%E8%83%BD%E8%AF%AD%E9%9F%B3%E5%8A%A9%E6%89%8B-%E6%89%A7%E8%A1%8C%E7%BB%93%E6%9E%9C.png" width=80% />
 </div>
 <p align="center"> 图3.13 非开发者模式-智能语音助手-执行结果 </p>
 ### 开发者模式案例
