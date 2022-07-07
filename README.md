@@ -9,7 +9,7 @@
 
 用户可以通过输入“【下载 （视频url）】”，而后点击“运行”的方式完成主流视频网站平台（如bilibili、youtube等）上视频的下载，此功能可有效帮助视频创作者获取到所需的视频素材。所要输入的代码和程序执行效果如下面的图3.8、图3.9所示：
 <div align=center>
-<img src="https://gitee.com/jiafaCompiler/blog-editor/blob/master/upload/%E9%9D%9E%E5%BC%80%E5%8F%91%E8%80%85%E6%A8%A1%E5%BC%8F-%E8%A7%86%E9%A2%91%E4%B8%8B%E8%BD%BD-%E8%BE%93%E5%85%A5%E4%BB%A3%E7%A0%81.png" width="180" height="105" />
+<img src="https://gitee.com/jiafaCompiler/blog-editor/raw/master/upload/%E9%9D%9E%E5%BC%80%E5%8F%91%E8%80%85%E6%A8%A1%E5%BC%8F-%E8%A7%86%E9%A2%91%E4%B8%8B%E8%BD%BD-%E8%BE%93%E5%85%A5%E4%BB%A3%E7%A0%81.png" width="180" height="105" />
 </div>
 <p align="center"> 图3.8 非开发者模式-视频下载-输入代码 </p>
 
