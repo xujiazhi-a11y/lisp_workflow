@@ -56,43 +56,43 @@
 
 #### 开发者模式-阶乘
 
-下图3.14展示如何用本研究中产出的汉化lisp语言以常规递归思路来实现阶乘算法过程。
+下图3.7展示如何用本研究中产出的汉化lisp语言以常规递归思路来实现阶乘算法过程。
 
 <div align=center>
-<img src="https://gitee.com/jiafaCompiler/blog-editor/raw/master/upload/%E9%9D%9E%E5%BC%80%E5%8F%91%E8%80%85%E6%A8%A1%E5%BC%8F-%E8%A7%86%E9%A2%91%E4%B8%8B%E8%BD%BD-%E6%89%A7%E8%A1%8C%E7%BB%93%E6%9E%9C.png" width=80% />
+<img src="https://gitee.com/jiafaCompiler/blog-editor/raw/master/upload/%E5%BC%80%E5%8F%91%E8%80%85%E6%A8%A1%E5%BC%8F-%E9%98%B6%E4%B9%98-%E8%BE%93%E5%85%A5%E4%BB%A3%E7%A0%81%E4%B8%8E%E6%89%A7%E8%A1%8C%E7%BB%93%E6%9E%9C.png" width=80% />
 </div>
-<p align="center"> 图3.15 开发者模式-阶乘-输入代码与执行结果 </p>
+<p align="center"> 图3.7 开发者模式-阶乘-输入代码与执行结果 </p>
 
 
 #### 开发者模式-开根
 
-下图3.15展示用不动点手段来实现开根算法过程（不动点计算公式：$x = f(x)$）
+下图3.8展示用不动点手段来实现开根算法过程（不动点计算公式：$x = f(x)$）
 
 <div align=center>
-<img src="https://gitee.com/jiafaCompiler/blog-editor/raw/master/upload/%E9%9D%9E%E5%BC%80%E5%8F%91%E8%80%85%E6%A8%A1%E5%BC%8F-%E8%A7%86%E9%A2%91%E4%B8%8B%E8%BD%BD-%E6%89%A7%E8%A1%8C%E7%BB%93%E6%9E%9C.png" width=80% />
+<img src="https://gitee.com/jiafaCompiler/blog-editor/raw/master/upload/%E5%BC%80%E5%8F%91%E8%80%85%E6%A8%A1%E5%BC%8F-%E5%BC%80%E6%A0%B9-%E8%BE%93%E5%85%A5%E4%BB%A3%E7%A0%81%E4%B8%8E%E6%89%A7%E8%A1%8C%E7%BB%93%E6%9E%9C.png" width=80% />
 </div>
-<p align="center"> 图3.16开发者模式-开根-输入代码与执行结果 </p>
+<p align="center"> 图3.8 开发者模式-开根-输入代码与执行结果 </p>
 
 #### 开发者模式-求导
 
-下图3.16展示求导算法的实现及程序执行结果。
+下图3.9展示求导算法的实现及程序执行结果。
 
 <div align=center>
-<img src="https://gitee.com/jiafaCompiler/blog-editor/raw/master/upload/%E9%9D%9E%E5%BC%80%E5%8F%91%E8%80%85%E6%A8%A1%E5%BC%8F-%E8%A7%86%E9%A2%91%E4%B8%8B%E8%BD%BD-%E6%89%A7%E8%A1%8C%E7%BB%93%E6%9E%9C.png" width=80% />
+<img src="https://gitee.com/jiafaCompiler/blog-editor/raw/master/upload/%E5%BC%80%E5%8F%91%E8%80%85%E6%A8%A1%E5%BC%8F-%E5%AF%BC%E6%95%B0-%E8%BE%93%E5%85%A5%E4%BB%A3%E7%A0%81%E4%B8%8E%E6%89%A7%E8%A1%8C%E7%BB%93%E6%9E%9C.png" width=80% />
 </div>
-<p align="center"> 图3.16开发者模式-导数-输入代码与执行结果 </p>
+<p align="center"> 图3.9 开发者模式-导数-输入代码与执行结果 </p>
 
 
 #### 开发者模式-哈夫曼编解码 
 
-下图3.17、3.18分别展示哈夫曼解码和哈夫曼编码算法的实现及程序执行结果。
+下图3.10、3.11分别展示哈夫曼解码和哈夫曼编码算法的实现及程序执行结果。
 
 <div align=center>
-<img src="https://gitee.com/jiafaCompiler/blog-editor/raw/master/upload/%E9%9D%9E%E5%BC%80%E5%8F%91%E8%80%85%E6%A8%A1%E5%BC%8F-%E8%A7%86%E9%A2%91%E4%B8%8B%E8%BD%BD-%E6%89%A7%E8%A1%8C%E7%BB%93%E6%9E%9C.png" width=80% />
+<img src="https://gitee.com/jiafaCompiler/blog-editor/raw/master/upload/%E5%BC%80%E5%8F%91%E8%80%85%E6%A8%A1%E5%BC%8F-%E5%93%88%E5%A4%AB%E6%9B%BC%E8%A7%A3%E7%A0%81-%E8%BE%93%E5%85%A5%E4%BB%A3%E7%A0%81%E4%B8%8E%E6%89%A7%E8%A1%8C%E7%BB%93%E6%9E%9C.png" width=80% />
 </div>
-<p align="center"> 图3.17开发者模式-哈夫曼解码-输入代码与执行结果 </p>
+<p align="center"> 图3.10 开发者模式-哈夫曼解码-输入代码与执行结果 </p>
 
 <div align=center>
-<img src="https://gitee.com/jiafaCompiler/blog-editor/raw/master/upload/%E9%9D%9E%E5%BC%80%E5%8F%91%E8%80%85%E6%A8%A1%E5%BC%8F-%E8%A7%86%E9%A2%91%E4%B8%8B%E8%BD%BD-%E6%89%A7%E8%A1%8C%E7%BB%93%E6%9E%9C.png" width=80% />
+<img src="https://gitee.com/jiafaCompiler/blog-editor/raw/master/upload/%E5%BC%80%E5%8F%91%E8%80%85%E6%A8%A1%E5%BC%8F-%E5%93%88%E5%A4%AB%E6%9B%BC%E7%BC%96%E7%A0%81-%E8%BE%93%E5%85%A5%E4%BB%A3%E7%A0%81%E4%B8%8E%E6%89%A7%E8%A1%8C%E7%BB%93%E6%9E%9C.png" width=80% />
 </div>
-<p align="center"> 图3.18开发者模式-哈夫曼编码-输入代码与执行结果 </p>
+<p align="center"> 图3.11 开发者模式-哈夫曼编码-输入代码与执行结果 </p>
