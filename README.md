@@ -29,7 +29,7 @@ python3 workflow_server.py
 
 ## 示例
 
-文章生成工作流示例：
+### 文章生成工作流
 
 ```lisp
 ;; 定义输入
@@ -44,9 +44,34 @@ python3 workflow_server.py
 (define articles (map expand-chapter outline))
 
 ;; 合并输出
-(define full-article (str-join "\\n\\n--------\\n\\n" articles))
+(define full-article (str-join "\n\n" articles))
 (print full-article)
 ```
+
+### 工作流组合：一屏 DAG 压缩成一行
+
+传统可视化画布上需要拖拽多个节点并连线的复杂工作流，在 Lisp 中可以用 `reduce` 优雅地压缩成一句话：
+
+```lisp
+;; 定义各个处理节点
+(define (input-data ctx) ...)
+(define (generate-outline ctx) ...)
+(define (parse-outline ctx) ...)
+(define (expand-sections ctx) ...)
+(define (build-article ctx) ...)
+
+;; 整个 workflow 主函数只有一行！
+(define (run-workflow ctx)
+  (reduce (lambda [c f] (f c)) ctx
+    [input-data generate-outline parse-outline expand-sections build-article]))
+```
+
+这种写法的精髓在于：
+- **节点即函数**：每个处理节点就是一个普通函数
+- **列表即工作流**：用列表定义执行顺序，直观且易于修改
+- **上下文贯穿**：`ctx` 承载所有中间状态，在节点间流转
+
+这就是函数式编程的优雅：列表即工作流定义！
 
 ## 内置函数
 
