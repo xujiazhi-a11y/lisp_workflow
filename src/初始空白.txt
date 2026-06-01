@@ -1,9 +1,0 @@
-【非开发者模式
-  【百度语音听写
-    【APP_ID 25989514】
-    【API_KEY ZnLgb47K5NennuMXo7L7wzvK】
-    【SECRET_KEY sYfFO7GMVKMnGLULw5Cih60a8NqqZbGX】
-    【如果 【说的话中含有 “录屏”】
-           【录屏】】
-】
-】

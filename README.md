@@ -1,98 +1,64 @@
-# 志语编辑器
+# Lisp Workflow
 
-## 1 简介
-这是一个简陋的编辑器，里面内嵌了一个汉化Lisp语言的解释器，愚以为lisp和汉语乃至中国文化可产生有趣碰撞，汉化lisp聊可接近自然语言编程一事；同时，结合汉化lisp的形式，又尝试简化并汉化开源社区中那些好用的包的使用命令，集成到一个编辑器中，通过这种新的交互上的尝试，试图希望能够让开源社区更好地普惠到中国大众。
+用 Lisp 重新理解 AI Workflow 的一次尝试。
 
-## 2 汉化lisp关键字命名说明
+## 缘起
 
-## 3 使用说明（具体案例）
-### 3.1 非开发者模式案例
-#### 非开发者模式-视频下载
+大模型落地时往往离不开多步骤的工作流编排，而当下的主流做法是拖拉拽的可视化画布。画布上的连线固然直观，但当节点数量攀升，维护成本也随之急剧上升。
 
-用户可以通过输入“【下载 （视频url）】”，而后点击“运行”的方式完成主流视频网站平台（如bilibili、youtube等）上视频的下载，此功能可有效帮助视频创作者获取到所需的视频素材。所要输入的代码和程序执行效果如下面的图3.1、图3.2所示：
-<div align=center>
-<img src="https://gitee.com/jiafaCompiler/blog-editor/raw/master/upload/%E9%9D%9E%E5%BC%80%E5%8F%91%E8%80%85%E6%A8%A1%E5%BC%8F-%E8%A7%86%E9%A2%91%E4%B8%8B%E8%BD%BD-%E8%BE%93%E5%85%A5%E4%BB%A3%E7%A0%81.png" width=80% />
-</div>
-<p align="center"> 图3.1 非开发者模式-视频下载-输入代码 </p>
+这个项目尝试换一个思路：用代码（而不是连线）来表达工作流。具体来说，是借助 Lisp 及其函数式编程的思想，将二维的连线图折叠成一维的极简代码。
 
-<div align=center>
-<img src="https://gitee.com/jiafaCompiler/blog-editor/raw/master/upload/%E9%9D%9E%E5%BC%80%E5%8F%91%E8%80%85%E6%A8%A1%E5%BC%8F-%E8%A7%86%E9%A2%91%E4%B8%8B%E8%BD%BD-%E6%89%A7%E8%A1%8C%E7%BB%93%E6%9E%9C.png" width=80% />
-</div>
-<p align="center"> 图3.2 非开发者模式-视频下载-执行结果 </p>
+## 核心理念
 
+**过程即变量**。在 Lisp 中，任何复杂的过程都可以被抽象成一个简单的函数名，直接塞进过程体中。Workflow 的节点本质上就是"过程"，而 Lisp 把"过程"当成数据自由传递的特性，使其天然具备承载工作流图谱的潜力。
 
-#### 非开发者模式-格式转换
+**高阶函数替代循环节点**。Map、Reduce、Filter 等函数可以优雅地替代传统画布上的迭代器节点。
 
-用户可以通过输入“【转为某某格式 文件存储地址】”，而后点击“运行”的方式完多媒体文件的格式转换，支持绝大部分多媒体文件格式，此功能可有效帮助到工作流中会涉及多媒体文件处理的人。所要输入的代码和程序执行效果如下面的图3.3、图3.4所示：
+## 项目状态
 
-<div align=center>
-<img src="https://gitee.com/jiafaCompiler/blog-editor/raw/master/upload/%E9%9D%9E%E5%BC%80%E5%8F%91%E8%80%85%E6%A8%A1%E5%BC%8F-%E6%A0%BC%E5%BC%8F%E8%BD%AC%E6%8D%A2-%E8%BE%93%E5%85%A5%E4%BB%A3%E7%A0%81.png" width=80% />
-</div>
-<p align="center"> 图3.3 非开发者模式-格式转换-输入代码 </p>
+这是一个简陋的起步，实现还非常基础。代码谈不上优雅，但希望能抛砖引玉，提供一种不同的视角来思考 Workflow 的终态。
 
-<div align=center>
-<img src="https://gitee.com/jiafaCompiler/blog-editor/raw/master/upload/%E9%9D%9E%E5%BC%80%E5%8F%91%E8%80%85%E6%A8%A1%E5%BC%8F-%E6%A0%BC%E5%BC%8F%E8%BD%AC%E6%8D%A2-%E6%89%A7%E8%A1%8C%E7%BB%93%E6%9E%9C.png" width=80% />
-</div>
-<p align="center"> 图3.4 非开发者模式-格式转换-执行结果 </p>
+## 快速开始
 
-#### 非开发者模式-格式转换
+```bash
+cd py
+python3 workflow_server.py
+```
 
-非开发者模式-智能语音助手
-用户可以通过输入“【百度语音听写 【APP_ID （APP_ID）】【API_KEY（API_KEY）】【SECRET_KEY （SECRET_KEY）】（语音命令式操作）】”就能完成一个简单的语音识别助手，现在可以实现用语音控制方式帮用户完成录屏、截屏、屏幕文字识别、播放具体视频、播放具体音频、看某某小说等等操作。实现成本（代码量）相对较低。所要输入的代码和程序执行效果如下面的图3.5、图3.6所示：
+然后打开 http://localhost:8080
 
-<div align=center>
-<img src="https://gitee.com/jiafaCompiler/blog-editor/raw/master/upload/%E9%9D%9E%E5%BC%80%E5%8F%91%E8%80%85%E6%A8%A1%E5%BC%8F-%E6%99%BA%E8%83%BD%E8%AF%AD%E9%9F%B3%E5%8A%A9%E6%89%8B-%E8%BE%93%E5%85%A5%E4%BB%A3%E7%A0%81.jpg" width=80% />
-</div>
-<p align="center"> 图3.5 非开发者模式-智能语音助手-输入代码 </p>
+## 示例
 
-<div align=center>
-<img src="https://gitee.com/jiafaCompiler/blog-editor/raw/master/upload/%E9%9D%9E%E5%BC%80%E5%8F%91%E8%80%85%E6%A8%A1%E5%BC%8F-%E6%99%BA%E8%83%BD%E8%AF%AD%E9%9F%B3%E5%8A%A9%E6%89%8B-%E6%89%A7%E8%A1%8C%E7%BB%93%E6%9E%9C.png" width=80% />
-</div>
-<p align="center"> 图3.6 非开发者模式-智能语音助手-执行结果 </p>
+文章生成工作流示例：
 
-### 3.2 开发者模式案例
+```lisp
+;; 定义输入
+(define title "庄子的人生感悟")
+(define chapters "1.得失的故事 2.困境的故事 3.选择的故事")
 
-“开发者模式”主在用汉化lisp语言实现一些工程、算法过程，完成对语言能力的进一步扩展。
+;; 调用 LLM 生成大纲
+(define outline-raw (call-llm outline-prompt))
+(define outline-parsed (extract-json outline-raw))
 
-#### 开发者模式-阶乘
+;; 迭代扩写
+(define articles (map expand-chapter outline))
 
-下图3.7展示如何用本研究中产出的汉化lisp语言以常规递归思路来实现阶乘算法过程。
+;; 合并输出
+(define full-article (str-join "\\n\\n--------\\n\\n" articles))
+(print full-article)
+```
 
-<div align=center>
-<img src="https://gitee.com/jiafaCompiler/blog-editor/raw/master/upload/%E5%BC%80%E5%8F%91%E8%80%85%E6%A8%A1%E5%BC%8F-%E9%98%B6%E4%B9%98-%E8%BE%93%E5%85%A5%E4%BB%A3%E7%A0%81%E4%B8%8E%E6%89%A7%E8%A1%8C%E7%BB%93%E6%9E%9C.png" width=80% />
-</div>
-<p align="center"> 图3.7 开发者模式-阶乘-输入代码与执行结果 </p>
+## 内置函数
 
+- 基础运算：`+`, `-`, `*`, `/`, `str`, `list`, `dict` 等
+- 控制流：`if`, `begin`, `lambda`, `define`, `let`
+- 高阶函数：`map`, `filter`, `reduce`
+- LLM 调用：`call-llm`, `llm`
+- 文本处理：`str-concat`, `str-replace`, `read-file`, `extract-json`, `to-json`
+- 管道操作：`->`, `pipe`
 
-#### 开发者模式-开根
+## 欢迎交流
 
-下图3.8展示用不动点手段来实现开根算法过程（不动点计算公式：$x = f(x)$）
+如果你也对可视化的臃肿感到疲劳，如果你相信代码与大模型的结合应该有更优雅的解法，欢迎来聊聊。
 
-<div align=center>
-<img src="https://gitee.com/jiafaCompiler/blog-editor/raw/master/upload/%E5%BC%80%E5%8F%91%E8%80%85%E6%A8%A1%E5%BC%8F-%E5%BC%80%E6%A0%B9-%E8%BE%93%E5%85%A5%E4%BB%A3%E7%A0%81%E4%B8%8E%E6%89%A7%E8%A1%8C%E7%BB%93%E6%9E%9C.png" width=80% />
-</div>
-<p align="center"> 图3.8 开发者模式-开根-输入代码与执行结果 </p>
-
-#### 开发者模式-求导
-
-下图3.9展示求导算法的实现及程序执行结果。
-
-<div align=center>
-<img src="https://gitee.com/jiafaCompiler/blog-editor/raw/master/upload/%E5%BC%80%E5%8F%91%E8%80%85%E6%A8%A1%E5%BC%8F-%E5%AF%BC%E6%95%B0-%E8%BE%93%E5%85%A5%E4%BB%A3%E7%A0%81%E4%B8%8E%E6%89%A7%E8%A1%8C%E7%BB%93%E6%9E%9C.png" width=80% />
-</div>
-<p align="center"> 图3.9 开发者模式-导数-输入代码与执行结果 </p>
-
-
-#### 开发者模式-哈夫曼编解码 
-
-下图3.10、3.11分别展示哈夫曼解码和哈夫曼编码算法的实现及程序执行结果。
-
-<div align=center>
-<img src="https://gitee.com/jiafaCompiler/blog-editor/raw/master/upload/%E5%BC%80%E5%8F%91%E8%80%85%E6%A8%A1%E5%BC%8F-%E5%93%88%E5%A4%AB%E6%9B%BC%E8%A7%A3%E7%A0%81-%E8%BE%93%E5%85%A5%E4%BB%A3%E7%A0%81%E4%B8%8E%E6%89%A7%E8%A1%8C%E7%BB%93%E6%9E%9C.png" width=80% />
-</div>
-<p align="center"> 图3.10 开发者模式-哈夫曼解码-输入代码与执行结果 </p>
-
-<div align=center>
-<img src="https://gitee.com/jiafaCompiler/blog-editor/raw/master/upload/%E5%BC%80%E5%8F%91%E8%80%85%E6%A8%A1%E5%BC%8F-%E5%93%88%E5%A4%AB%E6%9B%BC%E7%BC%96%E7%A0%81-%E8%BE%93%E5%85%A5%E4%BB%A3%E7%A0%81%E4%B8%8E%E6%89%A7%E8%A1%8C%E7%BB%93%E6%9E%9C.png" width=80% />
-</div>
-<p align="center"> 图3.11 开发者模式-哈夫曼编码-输入代码与执行结果 </p>
+GitHub: https://github.com/xujiazhi-a11y/lisp_workflow
