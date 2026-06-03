@@ -39,17 +39,60 @@ def update_llm_env():
     GLOBAL_ENV['llm'] = fn
 
 
+# 飞书 Webhook 配置
+FEISHU_WEBHOOK = "https://open.feishu.cn/open-apis/bot/v2/hook/422435e3-a5eb-489d-b410-35e5293d3df6"
+
+def feishu_send(title, content):
+    """发送消息到飞书群"""
+    try:
+        import urllib.request
+        import json
+
+        card = {
+            "msg_type": "interactive",
+            "card": {
+                "config": {"wide_screen_mode": True},
+                "header": {
+                    "title": {"tag": "plain_text", "content": title},
+                    "template": "red" if "负向" in title else "green"
+                },
+                "elements": [
+                    {"tag": "div", "text": {"tag": "plain_text", "content": content}}
+                ]
+            }
+        }
+
+        data = json.dumps(card).encode('utf-8')
+        req = urllib.request.Request(
+            FEISHU_WEBHOOK,
+            data=data,
+            headers={'Content-Type': 'application/json'}
+        )
+        with urllib.request.urlopen(req, timeout=10) as response:
+            result = json.loads(response.read().decode('utf-8'))
+            if result.get('code') == 0 or result.get('StatusCode') == 0:
+                return "飞书消息发送成功"
+            else:
+                return f"飞书发送失败: {result}"
+    except Exception as e:
+        return f"飞书发送失败: {str(e)}"
+
+
+# 注册飞书函数
+GLOBAL_ENV['send-to-feishu'] = feishu_send
+
+
 # 初始化时注入
 update_llm_env()
 
 
-def stream_print(text):
-    """流式打印 - 检查全局 markdown_mode"""
+def stream_print(*args):
+    """流式打印 - 支持多个参数"""
     global should_stop, markdown_mode
     if not should_stop:
-        # 转义换行符，保证多行内容作为一条消息发送
+        text = ' '.join(str(a) for a in args)
         prefix = "__MD__:" if markdown_mode else "__TEXT__:"
-        escaped = str(text).replace('\n', '↎')
+        escaped = text.replace('\n', '↎')
         output_queue.put(f"{prefix}{escaped}")
 
 
@@ -107,7 +150,7 @@ class Handler(BaseHTTPRequestHandler):
             # 返回示例列表
             examples_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'examples')
             examples_list = []
-            for fname in ['hello.lisp', 'article.lisp', 'workflow.lisp', 'llm.lisp']:
+            for fname in ['hello.lisp', 'article.lisp', 'workflow.lisp', 'llm.lisp', 'feishu_feedback.lisp']:
                 fpath = os.path.join(examples_dir, fname)
                 if os.path.exists(fpath):
                     with open(fpath, 'r', encoding='utf-8') as f:
@@ -295,6 +338,7 @@ HTML_PAGE = '''<!DOCTYPE html>
             <option value="article">文章生成工作流</option>
             <option value="workflow">工作流组合</option>
             <option value="llm">大模型对话</option>
+            <option value="feishu_feedback">飞书反馈处理</option>
         </select>
         <button class="btn btn-run" id="runBtn" onclick="runCode()">▶ 运行</button>
         <button class="btn btn-stop" id="stopBtn" onclick="stopCode()">⏹ 停止</button>

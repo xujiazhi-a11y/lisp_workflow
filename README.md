@@ -82,6 +82,50 @@ python3 workflow_server.py
 - 文本处理：`str-concat`, `str-replace`, `read-file`, `extract-json`, `to-json`
 - 管道操作：`->`, `pipe`
 
+## 示例说明
+
+### 1. Hello World (`examples/hello.lisp`)
+最简单的示例，展示基础语法和字符串操作。
+
+### 2. 大模型对话 (`examples/llm.lisp`)
+展示如何调用 LLM 并处理返回结果。
+
+### 3. 文章生成工作流 (`examples/article.lisp`)
+展示完整的多步骤 AI 工作流：
+- 调用 LLM 生成大纲
+- 解析 JSON 结果
+- 迭代扩写每个章节
+- 合并输出
+
+### 4. 工作流组合 (`examples/workflow.lisp`)
+展示"代码即数据"的核心理念：
+- 定义多个处理节点（input-data, generate-outline, parse-outline 等）
+- 用 `reduce` 组合成一个工作流
+- 上下文（ctx）在节点间流转
+
+### 5. 飞书反馈处理 (`examples/feishu_feedback.lisp`)
+展示带外部集成的 AI 工作流：
+- 分类用户反馈（正向/负向）
+- 细分问题类型（物流慢/质量差/其它）
+- 发送飞书群通知
+
+**注意**：飞书发送功能需要启动 `workflow_server.py`，因为 `send-to-feishu` 函数在该服务器中注册。
+
+## 开发指南
+
+详细开发规范和常见问题解决请参考：
+- `py/LISP_WORKFLOW_GUIDE.md` - Lisp 工作流开发指南
+
+### 重要：已知的解释器 Bug
+
+1. **let 绑定引用问题**：在单个 `let` 的多个绑定中，后面绑定不能引用前面绑定的变量。
+   - ❌ 错误：`(let [[x ...] [c (str-contains? "x" x)]] ...)`
+   - ✅ 正确：`(let [[x ...]] (let [[c (str-contains? "x" x)]] ...))`
+
+2. **字符串比较问题**：在 let 绑定中使用 `=` 比较可能出错。
+   - ❌ 错误：`(if (= x "test") ...)`
+   - ✅ 正确：`(if (str-starts? "test" x) ...)`
+
 ## 欢迎交流
 
 如果你也对可视化的臃肿感到疲劳，如果你相信代码与大模型的结合应该有更优雅的解法，欢迎来聊聊。
