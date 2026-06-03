@@ -39,17 +39,60 @@ def update_llm_env():
     GLOBAL_ENV['llm'] = fn
 
 
+# 飞书 Webhook 配置
+FEISHU_WEBHOOK = "https://open.feishu.cn/open-apis/bot/v2/hook/422435e3-a5eb-489d-b410-35e5293d3df6"
+
+def feishu_send(title, content):
+    """发送消息到飞书群"""
+    try:
+        import urllib.request
+        import json
+
+        card = {
+            "msg_type": "interactive",
+            "card": {
+                "config": {"wide_screen_mode": True},
+                "header": {
+                    "title": {"tag": "plain_text", "content": title},
+                    "template": "red" if "负向" in title else "green"
+                },
+                "elements": [
+                    {"tag": "div", "text": {"tag": "plain_text", "content": content}}
+                ]
+            }
+        }
+
+        data = json.dumps(card).encode('utf-8')
+        req = urllib.request.Request(
+            FEISHU_WEBHOOK,
+            data=data,
+            headers={'Content-Type': 'application/json'}
+        )
+        with urllib.request.urlopen(req, timeout=10) as response:
+            result = json.loads(response.read().decode('utf-8'))
+            if result.get('code') == 0 or result.get('StatusCode') == 0:
+                return "飞书消息发送成功"
+            else:
+                return f"飞书发送失败: {result}"
+    except Exception as e:
+        return f"飞书发送失败: {str(e)}"
+
+
+# 注册飞书函数
+GLOBAL_ENV['send-to-feishu'] = feishu_send
+
+
 # 初始化时注入
 update_llm_env()
 
 
-def stream_print(text):
-    """流式打印 - 检查全局 markdown_mode"""
+def stream_print(*args):
+    """流式打印 - 支持多个参数"""
     global should_stop, markdown_mode
     if not should_stop:
-        # 转义换行符，保证多行内容作为一条消息发送
+        text = ' '.join(str(a) for a in args)
         prefix = "__MD__:" if markdown_mode else "__TEXT__:"
-        escaped = str(text).replace('\n', '↎')
+        escaped = text.replace('\n', '↎')
         output_queue.put(f"{prefix}{escaped}")
 
 
@@ -107,7 +150,7 @@ class Handler(BaseHTTPRequestHandler):
             # 返回示例列表
             examples_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'examples')
             examples_list = []
-            for fname in ['hello.lisp', 'article.lisp', 'workflow.lisp', 'llm.lisp']:
+            for fname in ['hello.lisp', 'article.lisp', 'workflow.lisp', 'llm.lisp', 'feishu_feedback.lisp']:
                 fpath = os.path.join(examples_dir, fname)
                 if os.path.exists(fpath):
                     with open(fpath, 'r', encoding='utf-8') as f:
@@ -226,13 +269,17 @@ HTML_PAGE = '''<!DOCTYPE html>
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
     <title>Lisp Workflow</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/codemirror@5.65.16/lib/codemirror.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/codemirror@5.65.16/lib/codemirror.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/codemirror@5.65.16/addon/edit/matchbrackets.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/codemirror@5.65.16/addon/edit/closebrackets.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/dompurify@3.0.6/dist/purify.min.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body, html { margin: 0; padding: 0; height: 100%; overflow: hidden; }
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
             background: #1a1a2e; color: #eee; height: 100vh;
             display: flex; flex-direction: column;
         }
@@ -248,32 +295,91 @@ HTML_PAGE = '''<!DOCTYPE html>
         .btn-run { background: #4e6ef2; color: white; }
         .btn-run:hover { background: #6b8af9; }
         .btn-run:disabled { background: #444; cursor: not-allowed; }
-        .btn-stop { background: transparent; color: #4e6ef2; border: 1px solid #4e6ef2; display: none; }
-        .btn-stop:hover { background: #4e6ef2; color: white; }
-        .examples { padding: 8px 12px; background: #1a1a2e; color: #eee; border: 1px solid #0f3460; border-radius: 6px; }
+        .btn-stop { background: transparent; color: #ff6b6b; border: 1px solid #ff6b6b; display: none; }
+        .btn-stop:hover { background: #ff6b6b; color: white; }
+        .examples { padding: 8px 12px; background: #1a1a2e; color: #eee; border: 1px solid #0f3460; border-radius: 6px; font-size: 13px; }
         .main { flex: 1; display: flex; gap: 1px; background: #0f3460; min-height: 0; }
         .panel { display: flex; flex-direction: column; background: #1a1a2e; overflow: hidden; }
         .editor-panel { flex: 1; min-height: 0; }
         .console-panel { flex: 1; min-height: 0; }
-        .panel-header { padding: 10px 15px; background: #16213e; font-size: 13px; color: #888; border-bottom: 1px solid #0f3460; }
-        .code-area { flex: 1; width: 100%; padding: 15px; background: #1a1a2e; color: #eee; border: none; font-family: Monaco, Consolas, monospace; font-size: 14px; resize: none; outline: none; line-height: 1.6; }
-        .console-output { flex: 1; padding: 15px; overflow-y: auto; font-family: Monaco, Consolas, monospace; font-size: 13px; line-height: 1.5; background: #1a1a2e; min-height: 0; }
-        .console-output .error { color: #ff6b6b; }
-        .console-output .md-content { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 14px; line-height: 1.6; color: #ddd; }
-        .console-output .md-content h1, .console-output .md-content h2, .console-output .md-content h3 { color: #4e6ef2; margin: 1em 0 0.5em; }
-        .console-output .md-content p { margin: 0.5em 0; }
-        .console-output .md-content code { background: #2a2f42; padding: 2px 6px; border-radius: 3px; font-family: Monaco, Consolas, monospace; }
-        .console-output .md-content pre { background: #16213e; padding: 12px; border-radius: 6px; overflow-x: auto; }
-        .console-output .md-content pre code { background: transparent; padding: 0; }
-        .console-output .md-content ul, .console-output .md-content ol { margin: 0.5em 0; padding-left: 1.5em; }
-        .console-output .md-content blockquote { border-left: 3px solid #4e6ef2; margin: 0.5em 0; padding-left: 1em; color: #888; }
-        .console-output .result { color: #4ecca3; font-weight: 500; }
-        .console-output .output-line { padding: 2px 0; }
+        .panel-header { padding: 10px 15px; background: #16213e; font-size: 13px; color: #888; border-bottom: 1px solid #0f3460; display: flex; align-items: center; }
+        .editor-container { flex: 1; overflow: hidden; min-height: 0; position: relative; }
+
+        /* CodeMirror 5 dark theme overrides */
+        .CodeMirror { height: 100%; background: #1a1a2e; color: #eeffff; font-family: Monaco, Consolas, "Courier New", monospace; font-size: 14px; line-height: 1.6; }
+        .CodeMirror-gutters { background: #16213e; border-right: 1px solid #0f3460; }
+        .CodeMirror-linenumber { color: #444; padding: 0 8px; }
+        .CodeMirror-cursor { border-left: 2px solid #4e6ef2; }
+        .CodeMirror-selected { background: rgba(78, 110, 242, 0.15) !important; }
+        .CodeMirror-activeline-background { background: rgba(78, 110, 242, 0.05); }
+        .CodeMirror-matchingbracket { color: #fff !important; background: rgba(78, 110, 242, 0.3); outline: 1px solid rgba(78, 110, 242, 0.6); }
+        .CodeMirror-focused .CodeMirror-selected { background: rgba(78, 110, 242, 0.2) !important; }
+        .cm-s-lisp-dark .cm-keyword { color: #c792ea; font-weight: bold; }
+        .cm-s-lisp-dark .cm-builtin { color: #82aaff; }
+        .cm-s-lisp-dark .cm-stdlib { color: #ffcb6b; }
+        .cm-s-lisp-dark .cm-string { color: #c3e88d; }
+        .cm-s-lisp-dark .cm-number { color: #f78c6c; }
+        .cm-s-lisp-dark .cm-comment { color: #676e95; font-style: italic; }
+        .cm-s-lisp-dark .cm-atom { color: #ff5370; }
+        .cm-s-lisp-dark .cm-bracket { color: #89ddff; }
+        .cm-s-lisp-dark .cm-variable { color: #eeffff; }
+
+        .console-status-bar {
+            display: flex; align-items: center; gap: 16px;
+            padding: 8px 15px; background: #16213e;
+            border-bottom: 1px solid #0f3460; font-size: 12px;
+            font-family: Monaco, Consolas, monospace; flex-shrink: 0;
+        }
+        .status-indicator { display: flex; align-items: center; gap: 6px; color: #aaa; font-weight: 500; }
+        .state-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
+        .state-dot.idle { background: #555; }
+        .state-dot.running { background: #4e6ef2; animation: pulse 1.2s ease-in-out infinite; }
+        .state-dot.done { background: #4ecca3; }
+        .state-dot.error { background: #ff6b6b; }
+        @keyframes pulse { 0%,100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.4; transform: scale(0.8); } }
+        .status-time { color: #666; }
+        .status-steps { color: #666; margin-left: auto; }
+
+        .console-output {
+            flex: 1; padding: 2px 0; overflow-y: auto;
+            font-family: Monaco, Consolas, monospace;
+            font-size: 12px; line-height: 1.3; background: #1a1a2e; min-height: 0;
+        }
+        .console-output::-webkit-scrollbar { width: 5px; }
+        .console-output::-webkit-scrollbar-track { background: transparent; }
+        .console-output::-webkit-scrollbar-thumb { background: #333; border-radius: 3px; }
+        .console-output::-webkit-scrollbar-thumb:hover { background: #555; }
+
+        .output-line { padding: 1px 10px 1px 12px; border-left: 3px solid transparent; }
+        .output-line.type-output { border-left-color: #2a3a2a; color: #bbb; }
+        .output-line.type-result { border-left-color: #4ecca3; color: #4ecca3; font-weight: 500; background: rgba(78,204,163,0.05); border-radius: 0 3px 3px 0; margin: 3px 4px 3px 0; padding: 3px 10px 3px 12px; }
+        .output-line.type-error { border-left-color: #ff6b6b; color: #ff6b6b; background: rgba(255,107,107,0.07); border-radius: 0 3px 3px 0; margin: 3px 4px 3px 0; padding: 4px 10px 4px 12px; }
+        .output-line.type-md { border-left-color: #c792ea; padding: 2px 10px 2px 12px; }
+        .output-line.type-step { border-left-color: #4e6ef2; padding: 3px 10px 3px 12px; margin-top: 4px; }
+        .step-badge { display: inline-block; font-size: 9px; padding: 1px 5px; border-radius: 3px; background: #0f3460; color: #4e6ef2; font-weight: 700; margin-right: 6px; letter-spacing: 0.5px; vertical-align: middle; }
+        .step-text { color: #aaa; font-size: 12px; }
+
+        .output-line .md-content { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; font-size: 13px; line-height: 1.4; color: #ddd; }
+        .output-line .md-content h1, .output-line .md-content h2, .output-line .md-content h3 { color: #4e6ef2; margin: 0.3em 0 0.2em; font-size: 13px; }
+        .output-line .md-content p { margin: 0.2em 0; }
+        .output-line .md-content code { background: #2a2f42; padding: 1px 4px; border-radius: 2px; font-family: Monaco, Consolas, monospace; font-size: 11px; }
+        .output-line .md-content pre { background: #16213e; padding: 8px; border-radius: 4px; overflow-x: auto; margin: 0.3em 0; font-size: 11px; }
+        .output-line .md-content pre code { background: transparent; padding: 0; }
+        .output-line .md-content ul, .output-line .md-content ol { margin: 0.2em 0; padding-left: 1.2em; }
+        .output-line .md-content blockquote { border-left: 2px solid #4e6ef2; margin: 0.2em 0; padding-left: 0.8em; color: #888; }
+
+        .console-stats-bar {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 6px 15px; background: #16213e;
+            border-top: 1px solid #0f3460; font-size: 11px;
+            color: #555; font-family: Monaco, Consolas, monospace; flex-shrink: 0;
+        }
+
         .mode-toggle { display: flex; gap: 8px; margin-left: auto; align-items: center; }
         .btn-md { padding: 4px 10px; font-size: 11px; background: #2a2f42; color: #888; border: 1px solid #3a3f52; border-radius: 4px; cursor: pointer; transition: all 0.2s; }
         .btn-md:hover { background: #3a3f52; color: #ddd; }
         .btn-md.active { background: #4e6ef2; color: white; border-color: #4e6ef2; }
-        .footer { padding: 8px 20px; background: #16213e; font-size: 12px; color: #666; border-top: 1px solid #0f3460; }
+        .footer { padding: 8px 20px; background: #16213e; font-size: 12px; color: #666; border-top: 1px solid #0f3460; display: flex; justify-content: space-between; }
         .key-group { display: flex; align-items: center; gap: 4px; margin-left: auto; }
         .key-group input { padding: 6px 10px; background: #1a1a2e; color: #eee; border: 1px solid #0f3460; border-radius: 4px; font-size: 12px; width: 190px; }
         .key-group input:focus { outline: none; border-color: #4e6ef2; }
@@ -281,315 +387,381 @@ HTML_PAGE = '''<!DOCTYPE html>
         .key-btn:hover { background: #0f3460; color: #eee; }
         .key-btn.set { background: #4e6ef2; color: white; border-color: #4e6ef2; }
         .key-btn.set:hover { background: #6b8af9; }
-        .spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid #0f3460; border-top-color: #4e6ef2; border-radius: 50%; animation: spin 1s linear infinite; }
-        @keyframes spin { to { transform: rotate(360deg); } }
     </style>
 </head>
 <body>
     <div class="header">
         <h1>Lisp Workflow</h1>
         <span class="status ok" id="status">检查中...</span>
-        <select class="examples" id="exampleSelect" onchange="loadExample()">
+        <select class="examples" id="exampleSelect">
             <option value="">-- 加载示例 --</option>
             <option value="hello">Hello World</option>
             <option value="article">文章生成工作流</option>
             <option value="workflow">工作流组合</option>
             <option value="llm">大模型对话</option>
+            <option value="feishu_feedback">飞书反馈处理</option>
         </select>
-        <button class="btn btn-run" id="runBtn" onclick="runCode()">▶ 运行</button>
-        <button class="btn btn-stop" id="stopBtn" onclick="stopCode()">⏹ 停止</button>
+        <button class="btn btn-run" id="runBtn" onclick="runCode()">&#9654; 运行</button>
+        <button class="btn btn-stop" id="stopBtn" onclick="stopCode()">&#9724; 停止</button>
         <div class="key-group">
-            <input type="password" id="apiKeyInput" placeholder="输入 DeepSeek API Key" onkeydown="if(event.key==='Enter')setApiKey()">
-            <button class="key-btn" id="keyToggleBtn" onclick="toggleKeyVisibility()" title="显示/隐藏">👁</button>
+            <input type="password" id="apiKeyInput" placeholder="输入 DeepSeek API Key">
+            <button class="key-btn" id="keyToggleBtn" onclick="toggleKeyVisibility()" title="显示/隐藏">&#128065;</button>
             <button class="key-btn set" id="keySetBtn" onclick="setApiKey()">设置</button>
             <button class="key-btn" id="keyClearBtn" onclick="clearApiKey()" style="display:none">清除</button>
         </div>
         <div class="mode-toggle">
-            <button class="btn-md active" id="mdModeBtn" onclick="toggleMarkdownMode()">📄 Markdown</button>
+            <button class="btn-md active" id="mdModeBtn" onclick="toggleMarkdownMode()">Markdown</button>
         </div>
     </div>
     <div class="main">
         <div class="panel editor-panel">
-            <div class="panel-header">📝 代码编辑区 (Ctrl+Enter 运行)</div>
-            <textarea class="code-area" id="codeArea" spellcheck="false">;; Hello World
+            <div class="panel-header">代码编辑区 (Ctrl+Enter 运行)</div>
+            <div class="editor-container" id="editorContainer">
+                <textarea id="codeArea">;; Hello World
 (print "Hello, Lisp Workflow!")
 (print (str-concat "1 + 2 = " (str (+ 1 2))))
 "Done!"</textarea>
+            </div>
         </div>
         <div class="panel console-panel">
-            <div class="panel-header">💻 控制台</div>
-            <div class="console-output" id="consoleOutput">准备就绪</div>
+            <div class="console-status-bar">
+                <span class="status-indicator" id="execState"><span class="state-dot idle"></span> Idle</span>
+                <span class="status-time" id="execTime">0.0s</span>
+                <span class="status-steps" id="execSteps">0 steps</span>
+            </div>
+            <div class="console-output" id="consoleOutput"><div class="output-line type-system">准备就绪</div></div>
+            <div class="console-stats-bar">
+                <span id="totalLines">0 lines</span>
+                <span id="totalTime">-</span>
+            </div>
         </div>
     </div>
     <div class="footer">
-        <span>提示: Ctrl+Enter 快速运行 | Esc 停止执行</span>
+        <span>Ctrl+Enter 快速运行 | Esc 停止执行</span>
         <span id="footerStatus">就绪</span>
     </div>
-    
+
     <script>
-        const consoleOutput = document.getElementById('consoleOutput');
-        const codeArea = document.getElementById('codeArea');
-        const runBtn = document.getElementById('runBtn');
-        const stopBtn = document.getElementById('stopBtn');
-        const statusEl = document.getElementById('status');
-        const footerStatus = document.getElementById('footerStatus');
-        const mdModeBtn = document.getElementById('mdModeBtn');
-        
-        let isRunning = false;
-        let abortController = null;
-        let markdownMode = true;  // 默认开启 Markdown 渲染
-        
-        const examples = {
-            hello: "",
-            article: "",
-            workflow: "",
-            llm: ""
-        };
-        
-        // 加载示例列表
-        async function loadExamples() {
-            console.log('[Debug] loadExamples called');
-            try {
-                const r = await fetch('/api/examples');
-                console.log('[Debug] fetch completed');
-                const d = await r.json();
-                console.log('[Debug] JSON parsed, examples count:', d.examples ? d.examples.length : 0);
-                if (d.examples) {
-                    d.examples.forEach(ex => {
-                        console.log('[Debug] Loading example:', ex.name);
-                        examples[ex.name] = ex.code;
-                    });
-                }
-            } catch (e) {
-                console.error('[Debug] loadExamples error:', e);
+        // --- Custom Lisp mode for CodeMirror 5 ---
+        (function() {
+            var KEYWORDS = /^(define|lambda|if|let|begin|pipe|quote|set!|defmacro|map|reduce|filter|cond|when|unless|do|and|or|not)$/;
+            var KEYWORDS_CN = /^(定义|道|如果|开始|引|！赋)$/;
+            var BUILTINS = /^(call-llm|llm|send-to-feishu|str-concat|str-join|str-split|str-replace|str-trim|str-upper|str-lower|str-starts\?|str-ends\?|str-contains\?|format|print|println|pr|parse-json|to-json|extract-json|remove-think|regex-match|regex-replace|read-file|write-file|each|dict|get|put|keys|values|http-post|http-get|pipe|->)$/;
+            var STDLIB = /^(list|cons|car|cdr|first|rest|length|append|reverse|nth|take|drop|null\?|list\?|number\?|string\?|symbol\?|boolean\?|procedure\?|empty\?|dict\?|eq\?|equal\?|mod|str|abs|max|min|floor|ceil|round)$/;
+
+            CodeMirror.defineMode("lisp-workflow", function() {
+                return {
+                    startState: function() { return { inString: false }; },
+                    token: function(stream, state) {
+                        if (state.inString) {
+                            while (!stream.eol()) {
+                                var ch = stream.next();
+                                if (ch === '"') { state.inString = false; return "string"; }
+                                if (ch === "\\\\") stream.next();
+                            }
+                            return "string";
+                        }
+                        if (stream.eatSpace()) return null;
+                        var ch = stream.peek();
+                        if (ch === ";") { stream.skipToEnd(); return "comment"; }
+                        if (ch === '"') { stream.next(); state.inString = true; return "string"; }
+                        if (ch === "(" || ch === ")" || ch === "[" || ch === "]" || ch === "{" || ch === "}") { stream.next(); return "bracket"; }
+                        if (stream.match(/^#[tf](rue|alse)?\\b/)) return "atom";
+                        if (stream.match(/^-?\\d+(\\.\\d+)?/)) return "number";
+                        var word = "";
+                        while (!stream.eol()) {
+                            ch = stream.peek();
+                            if (/[\\s()\\[\\]{}";\\'\\\\]/.test(ch)) break;
+                            word += stream.next();
+                        }
+                        if (word) {
+                            if (KEYWORDS.test(word) || KEYWORDS_CN.test(word)) return "keyword";
+                            if (BUILTINS.test(word)) return "builtin";
+                            if (STDLIB.test(word)) return "stdlib";
+                            return "variable";
+                        }
+                        stream.next();
+                        return null;
+                    }
+                };
+            });
+        })();
+
+        // --- Initialize CodeMirror ---
+        var editor = CodeMirror.fromTextArea(document.getElementById("codeArea"), {
+            mode: "lisp-workflow",
+            theme: "lisp-dark",
+            lineNumbers: true,
+            matchBrackets: true,
+            autoCloseBrackets: true,
+            indentUnit: 2,
+            tabSize: 2,
+            indentWithTabs: false,
+            lineWrapping: true,
+            styleActiveLine: true,
+            extraKeys: {
+                "Ctrl-Enter": function() { runCode(); },
+                "Cmd-Enter": function() { runCode(); },
+                "Esc": function() { if (isRunning) stopCode(); }
             }
+        });
+
+        // --- State ---
+        var consoleOutput = document.getElementById("consoleOutput");
+        var runBtn = document.getElementById("runBtn");
+        var stopBtn = document.getElementById("stopBtn");
+        var statusEl = document.getElementById("status");
+        var footerStatus = document.getElementById("footerStatus");
+        var mdModeBtn = document.getElementById("mdModeBtn");
+        var isRunning = false;
+        var abortController = null;
+        var markdownMode = true;
+        var executionTimer = null;
+        var startTime = 0;
+        var stepCount = 0;
+        var lineCount = 0;
+
+        // --- Status bar ---
+        function setExecState(state) {
+            var labels = { idle: "Idle", running: "Running", done: "Done", error: "Error" };
+            document.getElementById("execState").innerHTML = "<span class=\\"state-dot " + state + "\\"></span> " + labels[state];
+        }
+        function startTimer() {
+            startTime = performance.now();
+            stepCount = 0; lineCount = 0;
+            document.getElementById("execTime").textContent = "0.0s";
+            document.getElementById("execSteps").textContent = "0 steps";
+            document.getElementById("totalLines").textContent = "0 lines";
+            executionTimer = setInterval(function() {
+                document.getElementById("execTime").textContent = ((performance.now() - startTime) / 1000).toFixed(1) + "s";
+            }, 100);
+        }
+        function stopTimer() {
+            if (executionTimer) { clearInterval(executionTimer); executionTimer = null; }
+            var total = ((performance.now() - startTime) / 1000).toFixed(2);
+            document.getElementById("totalTime").textContent = total + "s";
+            document.getElementById("execTime").textContent = total + "s";
+        }
+        function updateStats() {
+            document.getElementById("totalLines").textContent = lineCount + " lines";
+            document.getElementById("execSteps").textContent = stepCount + " steps";
+        }
+
+        // --- Examples ---
+        var examples = {};
+        function loadExamples() {
+            fetch("/api/examples").then(function(r) { return r.json(); }).then(function(d) {
+                if (d.examples) d.examples.forEach(function(ex) { examples[ex.name] = ex.code; });
+            }).catch(function() {});
         }
         loadExamples();
-        
-        function loadExample() {
-            console.log('[Debug] loadExample called, value:', document.getElementById('exampleSelect').value);
-            const select = document.getElementById('exampleSelect');
-            if (select.value && examples[select.value]) {
-                console.log('[Debug] Setting codeArea, example:', select.value, 'length:', examples[select.value].length);
-                codeArea.value = examples[select.value];
-            } else {
-                console.log('[Debug] No example found for:', select.value);
-                console.log('[Debug] available examples:', Object.keys(examples));
+
+        document.getElementById("exampleSelect").addEventListener("change", function() {
+            if (this.value && examples[this.value]) {
+                editor.setValue(examples[this.value]);
             }
+        });
+
+        // --- Console ---
+        function escapeHtml(s) {
+            return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
         }
-        
-        function log(msg, type = 'text') {
-            const el = document.createElement('div');
-            el.className = 'output-line';
-            
-            if (type === 'error') {
-                el.classList.add('error');
+        function log(msg, type) {
+            type = type || "text";
+            var el = document.createElement("div");
+            el.className = "output-line";
+            if (type === "system") {
+                if (msg.indexOf(">>>") === 0) {
+                    stepCount++;
+                    var text = msg.replace(/^>>>\s*/, "");
+                    el.innerHTML = "<span class=\\"step-badge\\">STEP " + stepCount + "</span><span class=\\"step-text\\">" + escapeHtml(text) + "</span>";
+                    el.classList.add("type-step");
+                } else {
+                    el.classList.add("type-step");
+                    el.innerHTML = "<span class=\\"step-text\\">" + escapeHtml(msg) + "</span>";
+                }
+            } else if (type === "error") {
+                el.classList.add("type-error");
                 el.textContent = msg;
-            } else if (type === 'result') {
-                el.classList.add('result');
+            } else if (type === "result") {
+                el.classList.add("type-result");
                 el.textContent = msg;
-            } else if (type === 'md' || (markdownMode && type === 'text')) {
-                el.classList.add('md-content');
-                el.innerHTML = DOMPurify.sanitize(marked.parse(msg));
+            } else if (type === "md" || (markdownMode && type === "text")) {
+                el.classList.add("type-md");
+                var md = document.createElement("div");
+                md.className = "md-content";
+                md.innerHTML = DOMPurify.sanitize(marked.parse(msg));
+                el.appendChild(md);
             } else {
+                el.classList.add("type-output");
                 el.textContent = msg;
             }
-            
+            lineCount++;
             consoleOutput.appendChild(el);
+            updateStats();
             consoleOutput.scrollTop = consoleOutput.scrollHeight;
         }
 
-        function clearConsole() {
-            consoleOutput.innerHTML = '';
-        }
-        
+        function clearConsole() { consoleOutput.innerHTML = ""; lineCount = 0; updateStats(); }
+
         function toggleMarkdownMode() {
             markdownMode = !markdownMode;
-            mdModeBtn.classList.toggle('active', markdownMode);
-            
-            // 如果启用 Markdown，实时渲染已有内容
-            if (markdownMode) {
-                const items = consoleOutput.querySelectorAll('.output-line');
-                items.forEach(item => {
-                    if (item.classList.contains('md-content')) return; // 跳过已渲染的
-                    const text = item.textContent;
-                    const newEl = document.createElement('div');
-                    newEl.className = 'output-line md-content';
-                    newEl.innerHTML = DOMPurify.sanitize(marked.parse(text));
-                    item.replaceWith(newEl);
-                });
-            }
+            mdModeBtn.classList.toggle("active", markdownMode);
         }
-        
+
+        // --- Run/Stop ---
         function setRunning(running) {
             isRunning = running;
-            runBtn.style.display = running ? 'none' : 'block';
-            stopBtn.style.display = running ? 'block' : 'none';
+            runBtn.style.display = running ? "none" : "inline-block";
+            stopBtn.style.display = running ? "inline-block" : "none";
             runBtn.disabled = running;
-            footerStatus.textContent = running ? '执行中... (按 Esc 停止)' : '就绪';
+            footerStatus.textContent = running ? "执行中... (按 Esc 停止)" : "就绪";
+            if (running) { setExecState("running"); startTimer(); }
         }
-        
-        async function runCode() {
+
+        function runCode() {
             if (isRunning) return;
-            
-            const code = codeArea.value;
+            var code = editor.getValue();
             setRunning(true);
             clearConsole();
-            log('>>> 开始执行...');
-            
+            log(">>> 开始执行...", "system");
             abortController = new AbortController();
-            
-            try {
-                console.log('[Frontend] Sending request, markdownMode:', markdownMode);
-                const response = await fetch('/api/execute', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ code: code, markdown: markdownMode }),
-                    signal: abortController.signal
-                });
-                
-                const reader = response.body.getReader();
-                const decoder = new TextDecoder();
-                
-                while (true) {
-                    const { done, value } = await reader.read();
-                    if (done) break;
-                    
-                    const text = decoder.decode(value);
-                    const lines = text.split('\\n');
-                    
-                    for (const line of lines) {
-                        if (line.startsWith('data: ')) {
-                            const data = line.substring(6);
-                            if (data === '__DONE__') {
-                                log('执行完成', 'text');
-                            } else if (data.startsWith('__ERROR__:')) {
-                                log('错误: ' + data.substring(10), 'error');
-                            } else if (data.startsWith('__RESULT__:')) {
-                                log('=> ' + data.substring(11), 'result');
-                            } else if (data.startsWith('__MD__:')) {
-                                const content = data.substring(7).replace(/↎/g, String.fromCharCode(10));
-                                log(content, 'md');
-                            } else if (data.startsWith('__TEXT__:')) {
-                                const content = data.substring(8).replace(/↎/g, String.fromCharCode(10));
-                                log(content, 'text');
-                            } else if (data) {
-                                // 向后兼容：无前缀的普通文本
-                                const decoded = data.replace(/↎/g, String.fromCharCode(10));
-                                log(decoded, 'text');
+            fetch("/api/execute", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ code: code, markdown: markdownMode }),
+                signal: abortController.signal
+            }).then(function(response) {
+                var reader = response.body.getReader();
+                var decoder = new TextDecoder();
+                function read() {
+                    reader.read().then(function(result) {
+                        if (result.done) { setRunning(false); return; }
+                        var text = decoder.decode(result.value);
+                        var lines = text.split("\\n");
+                        for (var i = 0; i < lines.length; i++) {
+                            var line = lines[i];
+                            if (line.indexOf("data: ") === 0) {
+                                var data = line.substring(6);
+                                if (data === "__DONE__") {
+                                    stopTimer(); setExecState("done");
+                                    log(">>> 执行完成", "system");
+                                } else if (data.indexOf("__ERROR__:") === 0) {
+                                    stopTimer(); setExecState("error");
+                                    log(data.substring(10), "error");
+                                } else if (data.indexOf("__RESULT__:") === 0) {
+                                    stepCount++;
+                                    log("=> " + data.substring(11), "result");
+                                } else if (data.indexOf("__MD__:") === 0) {
+                                    stepCount++;
+                                    var content = data.substring(7).replace(/↎/g, "\\n");
+                                    log(content, "md");
+                                } else if (data.indexOf("__TEXT__:") === 0) {
+                                    stepCount++;
+                                    var content = data.substring(8).replace(/↎/g, "\\n");
+                                    log(content, "text");
+                                } else if (data) {
+                                    stepCount++;
+                                    var decoded = data.replace(/↎/g, "\\n");
+                                    log(decoded, "text");
+                                }
                             }
                         }
-                    }
+                        read();
+                    }).catch(function(e) {
+                        stopTimer();
+                        if (e.name === "AbortError") {
+                            setExecState("idle");
+                            log(">>> 已停止", "system");
+                        } else {
+                            setExecState("error");
+                            log("请求失败: " + e.message, "error");
+                        }
+                        setRunning(false);
+                    });
                 }
-            } catch (e) {
-                if (e.name === 'AbortError') {
-                    log('\\n>>> 已停止');
+                read();
+            }).catch(function(e) {
+                stopTimer();
+                if (e.name === "AbortError") {
+                    setExecState("idle");
+                    log(">>> 已停止", "system");
                 } else {
-                    log('\\n请求失败: ' + e.message);
+                    setExecState("error");
+                    log("请求失败: " + e.message, "error");
                 }
-            }
-            
-            setRunning(false);
+                setRunning(false);
+            });
         }
-        
-        async function stopCode() {
-            log('\\n>>> 正在停止...');
-            
-            // 中止前端请求
-            if (abortController) {
-                abortController.abort();
-            }
-            
-            // 通知后端停止
-            try {
-                await fetch('/api/stop', { method: 'POST' });
-            } catch (e) {}
-            
-            setRunning(false);
+
+        function stopCode() {
+            log(">>> 正在停止...", "system");
+            if (abortController) abortController.abort();
+            fetch("/api/stop", { method: "POST" }).catch(function() {});
         }
-        
-        // 快捷键
-        document.addEventListener('keydown', (e) => {
-            if (e.ctrlKey && e.key === 'Enter' && !isRunning) runCode();
-            if (e.key === 'Escape' && isRunning) stopCode();
+
+        // --- Keyboard shortcuts ---
+        document.addEventListener("keydown", function(e) {
+            if ((e.ctrlKey || e.metaKey) && e.key === "Enter" && !isRunning) runCode();
+            if (e.key === "Escape" && isRunning) stopCode();
         });
-        
-        // 检查状态
-        async function refreshStatus() {
-            try {
-                const r = await fetch('/api/status');
-                const d = await r.json();
-                statusEl.textContent = d.api_key_set ? 'API Key ✓' : '无 API Key';
-                statusEl.className = 'status ' + (d.api_key_set ? 'ok' : '');
-            } catch {
-                statusEl.textContent = '连接失败';
-                statusEl.className = 'status';
-            }
+
+        // --- API Key ---
+        function toggleKeyVisibility() {
+            var inp = document.getElementById("apiKeyInput");
+            inp.type = inp.type === "password" ? "text" : "password";
+        }
+        function setApiKey() {
+            var key = document.getElementById("apiKeyInput").value.trim();
+            if (!key) { alert("请输入 API Key"); return; }
+            fetch("/api/config", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ api_key: key }) })
+            .then(function(r) { return r.json(); })
+            .then(function(d) {
+                if (d.status === "ok") {
+                    document.getElementById("apiKeyInput").value = "";
+                    document.getElementById("apiKeyInput").placeholder = "已设置: " + key.substring(0,4) + "****" + (key.length>8?key.substring(key.length-4):"");
+                    document.getElementById("apiKeyInput").type = "password";
+                    document.getElementById("keySetBtn").style.display = "none";
+                    document.getElementById("keyClearBtn").style.display = "inline-block";
+                    statusEl.textContent = "API Key \\u2713";
+                    statusEl.className = "status ok";
+                } else { alert(d.message); }
+            }).catch(function(e) { alert("设置失败: " + e.message); });
+        }
+        function clearApiKey() {
+            if (!confirm("确认清除 API Key？")) return;
+            fetch("/api/config", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ clear: true }) })
+            .then(function(r) { return r.json(); })
+            .then(function(d) {
+                if (d.status === "ok") {
+                    document.getElementById("apiKeyInput").placeholder = "输入 DeepSeek API Key";
+                    document.getElementById("apiKeyInput").type = "password";
+                    document.getElementById("keySetBtn").style.display = "inline-block";
+                    document.getElementById("keyClearBtn").style.display = "none";
+                    statusEl.textContent = "无 API Key";
+                    statusEl.className = "status";
+                }
+            }).catch(function(e) { alert("清除失败: " + e.message); });
+        }
+        document.getElementById("apiKeyInput").addEventListener("keydown", function(e) { if (e.key === "Enter") setApiKey(); });
+
+        // --- Status check ---
+        function refreshStatus() {
+            fetch("/api/status").then(function(r) { return r.json(); }).then(function(d) {
+                statusEl.textContent = d.api_key_set ? "API Key \\u2713" : "无 API Key";
+                statusEl.className = "status " + (d.api_key_set ? "ok" : "");
+            }).catch(function() { statusEl.textContent = "连接失败"; statusEl.className = "status"; });
         }
         refreshStatus();
-
-        // 检查是否已有 key
-        fetch('/api/config')
-            .then(r => r.json())
-            .then(d => {
-                if (d.api_key_set) {
-                    document.getElementById('keySetBtn').style.display = 'none';
-                    document.getElementById('keyClearBtn').style.display = 'inline-block';
-                    document.getElementById('apiKeyInput').placeholder = '已设置: ' + d.masked_key;
-                    statusEl.textContent = 'API Key ✓';
-                    statusEl.className = 'status ok';
-                }
-            })
-            .catch(() => {});
-
-        function toggleKeyVisibility() {
-            const inp = document.getElementById('apiKeyInput');
-            inp.type = inp.type === 'password' ? 'text' : 'password';
-        }
-
-        async function setApiKey() {
-            const key = document.getElementById('apiKeyInput').value.trim();
-            if (!key) { alert('请输入 API Key'); return; }
-            try {
-                const r = await fetch('/api/config', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ api_key: key })
-                });
-                const d = await r.json();
-                if (d.status === 'ok') {
-                    document.getElementById('apiKeyInput').value = '';
-                    document.getElementById('apiKeyInput').placeholder = '已设置: ' + key.substring(0,4) + '****' + (key.length>8?key.substring(key.length-4):'');
-                    document.getElementById('apiKeyInput').type = 'password';
-                    document.getElementById('keySetBtn').style.display = 'none';
-                    document.getElementById('keyClearBtn').style.display = 'inline-block';
-                    statusEl.textContent = 'API Key ✓';
-                    statusEl.className = 'status ok';
-                } else {
-                    alert(d.message);
-                }
-            } catch (e) { alert('设置失败: ' + e.message); }
-        }
-
-        async function clearApiKey() {
-            if (!confirm('确认清除 API Key？')) return;
-            try {
-                const r = await fetch('/api/config', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ clear: true })
-                });
-                const d = await r.json();
-                if (d.status === 'ok') {
-                    document.getElementById('apiKeyInput').placeholder = '输入 DeepSeek API Key';
-                    document.getElementById('apiKeyInput').type = 'password';
-                    document.getElementById('keySetBtn').style.display = 'inline-block';
-                    document.getElementById('keyClearBtn').style.display = 'none';
-                    statusEl.textContent = '无 API Key';
-                    statusEl.className = 'status';
-                }
-            } catch (e) { alert('清除失败: ' + e.message); }
-        }
+        fetch("/api/config").then(function(r) { return r.json(); }).then(function(d) {
+            if (d.api_key_set) {
+                document.getElementById("keySetBtn").style.display = "none";
+                document.getElementById("keyClearBtn").style.display = "inline-block";
+                document.getElementById("apiKeyInput").placeholder = "已设置: " + d.masked_key;
+                statusEl.textContent = "API Key \\u2713";
+                statusEl.className = "status ok";
+            }
+        }).catch(function() {});
     </script>
 </body>
 </html>

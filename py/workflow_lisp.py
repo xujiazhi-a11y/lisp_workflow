@@ -141,54 +141,67 @@ class Tokenizer:
                 self.line = ''
                 continue
 
-            # === 处理多行字符串（跨行字符串字面量）===
+            # === 处理字符串 ===
             if first_char == '"':
-                # 从当前行开始收集字符串
+                rest = self.line[1:]  # Everything after the first quote
+                
+                # 跳过前导空白
+                space_end = 0
+                while space_end < len(rest) and rest[space_end].isspace():
+                    space_end += 1
+                
+                # 查找闭合引号（从非空白部分开始搜索）
+                has_closing = False
+                closing_pos = -1  # Position in rest (0-indexed), +1 for the closing quote
+                for i in range(space_end, len(rest)):
+                    ch = rest[i]
+                    if ch == '\\':
+                        continue
+                    if ch == '"':
+                        has_closing = True
+                        closing_pos = i + 1  # Position in rest, +1 includes closing quote
+                        break
+                    if ch in "()'`;{}[":
+                        # 遇到特殊字符，说明引号后面不是字符串
+                        break
+
+                if has_closing:
+                    # Token includes: opening quote (1 char) + content + closing quote
+                    # closing_pos is in rest, so total token length = 1 + closing_pos
+                    token = self.line[:1 + closing_pos]
+                    self.line = self.line[1 + closing_pos:]
+                    return token
+
+                # 当前行没有闭合引号，使用多行字符串处理器
                 in_string = True
                 string_parts = []
-                i = 1  # 跳过开头的 "
-                current_line = self.line[1:]  # 去掉开头的 "
+                current_line = rest
 
                 while in_string:
-                    # 在当前行片段中查找下一个引号或特殊字符
                     j = 0
                     while j < len(current_line):
                         ch = current_line[j]
                         if ch == '\\':
-                            # 转义字符，跳过两个字符
                             j += 2
                             continue
                         if ch == '"':
                             # 找到闭合引号
-                            # 收集从开始到闭合引号的内容（包括闭合引号）
                             string_parts.append(current_line[:j+1])
                             self.line = current_line[j+1:]
                             in_string = False
                             break
-                        # 遇到特殊字符（可能表示字符串在该位置结束）
-                        if ch in "()'` ;{":
-                            prev = current_line[j - 1] if j > 0 else ''
-                            if prev == '"':
-                                # 前一个是引号，字符串结束
-                                string_parts.append(current_line[:j])
-                                self.line = current_line[j:]
-                                in_string = False
-                                break
                         j += 1
 
                     if in_string:
-                        # 当前行片段没有闭合引号，继续读取下一行
                         string_parts.append(current_line)
                         string_parts.append('\n')
                         self.line = ''
 
-                        # 读取下一行
                         next_line = self.file.readline()
                         if next_line == '':
                             raise SyntaxError('字符串未闭合')
                         current_line = next_line
 
-                # 组合所有部分，并在开头添加 "
                 return '"' + ''.join(string_parts)
 
             # === 解析标识符 ===
@@ -199,6 +212,14 @@ class Tokenizer:
                 token = self.line[:i]
                 self.line = self.line[i:]
                 return token
+
+            # === 解析其他标识符 ===
+            i = 1
+            while i < len(self.line) and not self.line[i].isspace() and self.line[i] not in "()'`,\";{}[]":
+                i += 1
+            token = self.line[:i]
+            self.line = self.line[i:]
+            return token
 
             # === 查找字符串 ===
             in_string = False
@@ -224,8 +245,14 @@ class Tokenizer:
                 raise SyntaxError('字符串未闭合: ' + self.line)
 
             # 没有找到字符串，也没有特殊字符
+            # === 解析标识符或运算符 ===
+            # 如果首字符不是字母数字，需要单独处理
+            if not first_char.isalnum() and first_char not in "_-":
+                # 这是一个运算符或特殊字符
+                self.line = self.line[1:]
+                return first_char
+
             # === 解析标识符 ===
-            i = 1
             while i < len(self.line) and not self.line[i].isspace() and self.line[i] not in "()'`,\";{}[]":
                 i += 1
             token = self.line[:i]
@@ -340,6 +367,13 @@ class Env(dict):
             raise LookupError(f'未定义的符号: {var}')
         else:
             return self.outer.find(var)
+
+    def set_local(self, var, value):
+        """设置变量，如果存在则更新，否则创建新的绑定"""
+        if var in self:
+            self[var] = value
+        else:
+            self[var] = value
 
 
 class Procedure:
@@ -574,6 +608,37 @@ def make_global_env():
 # 全局环境
 GLOBAL_ENV = make_global_env()
 
+# 飞书 Webhook 配置
+FEISHU_WEBHOOK = "https://open.feishu.cn/open-apis/bot/v2/hook/422435e3-a5eb-489d-b410-35e5293d3df6"
+
+def feishu_send(title, content):
+    """发送消息到飞书群"""
+    try:
+        import urllib.request
+        import json
+        card = {
+            "msg_type": "interactive",
+            "card": {
+                "config": {"wide_screen_mode": True},
+                "header": {
+                    "title": {"tag": "plain_text", "content": title},
+                    "template": "red" if "负向" in title else "green"
+                },
+                "elements": [
+                    {"tag": "div", "text": {"tag": "plain_text", "content": content}}
+                ]
+            }
+        }
+        data = json.dumps(card).encode('utf-8')
+        req = urllib.request.Request(FEISHU_WEBHOOK, data=data, headers={'Content-Type': 'application/json'})
+        with urllib.request.urlopen(req, timeout=10) as response:
+            result = json.loads(response.read().decode('utf-8'))
+            return "飞书发送成功" if result.get('code') == 0 or result.get('StatusCode') == 0 else f"发送失败: {result}"
+    except Exception as e:
+        return f"飞书发送失败: {str(e)}"
+
+GLOBAL_ENV['send-to-feishu'] = feishu_send
+
 
 # ============================================================
 # 求值器
@@ -696,28 +761,30 @@ def evaluate(exp, env: Env = GLOBAL_ENV):
         else:
             binding_list = bindings
 
-        params = []
-        args = []
+        # 创建新的环境层
+        new_env = Env((), (), env)
+
+        # 逐个处理绑定，让后续绑定能引用前面的绑定
         for b in binding_list:
             # 检查是否是带 __data__ 标记的绑定（来自方括号）
             if isinstance(b, list) and len(b) > 0 and b[0] == DATA_LIST_MARKER:
                 # 格式: ['__data__', name, value]
                 # 移除标记，取 name 和 value
                 if len(b) >= 3:
-                    params.append(b[1])  # name
-                    args.append(evaluate(b[2], env))  # value
+                    name = b[1]
+                    value = evaluate(b[2], new_env)
+                    new_env[name] = value
                 elif len(b) == 2:
-                    params.append(b[1])
-                    args.append(None)
+                    new_env[b[1]] = None
             elif isinstance(b, list) and len(b) >= 2:
                 # 普通绑定 (name value)
-                params.append(b[0])
-                args.append(evaluate(b[1], env))
+                name = b[0]
+                value = evaluate(b[1], new_env)
+                new_env[name] = value
             elif isinstance(b, list) and len(b) == 1:
                 # 单元素列表
-                params.append(b[0])
-                args.append(None)
-        new_env = Env(params, args, env)
+                new_env[b[0]] = None
+
         # 执行所有 body 表达式，返回最后一个
         result = None
         for body in bodies:
