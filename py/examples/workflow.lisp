@@ -1,43 +1,89 @@
-;; ============================================
-;; 文章生成工作流 - 代码即数据
-;; 展示：用简洁的主函数串联复杂的工作流
-;; ============================================
+;; ============================================================
+;; 文章生成工作流（pipeline 版）
+;;
+;; 流程：
+;;
+;;   空上下文(dict)
+;;       │
+;;       ▼
+;;   ┌─────────────┐
+;;   │ input-data   │  注入标题到上下文
+;;   └─────┬───────┘
+;;         │
+;;         ▼
+;;   ┌──────────────────┐
+;;   │ generate-outline  │  LLM 生成大纲文本
+;;   └─────┬────────────┘
+;;         │
+;;         ▼
+;;   ┌─────────────────┐
+;;   │ parse-outline    │  extract-json 解析为列表
+;;   └─────┬───────────┘
+;;         │
+;;         ▼
+;;   ┌──────────────────┐
+;;   │ expand-sections   │  map: 逐章调用 LLM 扩写
+;;   └─────┬────────────┘
+;;         │
+;;         ▼
+;;   ┌─────────────────┐
+;;   │ build-article    │  拼接标题 + 各章内容
+;;   └─────────────────┘
+;;
+;; 特点：用 reduce 将节点列表串联为 pipeline，
+;;       上下文(ctx)在节点间传递，实现「代码即工作流」
+;;
+;; 依赖：call-llm, extract-json, remove-think
+;; ============================================================
 
-;; ---------- 第一步：定义各个处理节点 ----------
 
-;; 节点1: 输入标题和章节
+;; ------------------------------------------------------------
+;; 1. Prompt 模板
+;; ------------------------------------------------------------
+
+(define outline-prompt-template
+  "请为《%s》生成3个大纲章节")
+
+(define expand-prompt-template
+  "请为文章章节《%s》撰写正文内容，约300字。要求：只输出正文，不要使用任何标题格式。")
+
+
+;; ------------------------------------------------------------
+;; 2. Pipeline 节点
+;;    每个节点接收 ctx(dict)，处理后返回更新的 ctx
+;; ------------------------------------------------------------
+
+;; 注入文章标题
 (define (input-data ctx)
   (put ctx "title" "Lisp语言入门指南"))
 
-;; 节点2: 调用 LLM 生成大纲
+;; 调用 LLM 生成大纲文本
 (define (generate-outline ctx)
-  (let [[prompt (str-concat "请为《" (get ctx "title") "》生成3个大纲章节")]]
+  (let [[prompt (format outline-prompt-template (get ctx "title"))]]
     (print ">>> 调用大模型生成大纲...")
     (put ctx "outline" (call-llm prompt))))
 
-;; 节点3: 解析大纲为列表
+;; 解析大纲 JSON，失败则使用默认章节
 (define (parse-outline ctx)
-  (let [[raw (get ctx "outline")]]
-    (let [[parsed (extract-json raw)]]
-      (print ">>> 解析大纲...")
-      (put ctx "sections"
-        (if (null? parsed)
-            (list "第一章：Lisp简介" "第二章：函数定义" "第三章：宏")
-            parsed)))))
+  (let [[parsed (extract-json (get ctx "outline"))]]
+    (print ">>> 解析大纲...")
+    (put ctx "sections"
+      (if (null? parsed)
+          (list "第一章：Lisp简介" "第二章：函数定义" "第三章：宏")
+          parsed))))
 
-;; 节点4: 调用 LLM 扩写章节
+;; 逐章调用 LLM 扩写
 (define (expand-sections ctx)
   (let [[sections (get ctx "sections")]]
     (print ">>> 调用大模型扩写章节...")
     (put ctx "articles"
       (map (lambda [s]
-             (let [[prompt (str-concat
-               "请为文章章节《" s "》撰写正文内容，约300字。要求：只输出正文，不要使用任何标题格式。")]]
-               (let [[content (remove-think (call-llm prompt))]]
-                 (str-concat "## " s "\n\n" content))))
+             (let [[content (remove-think
+                    (call-llm (format expand-prompt-template s)))]]
+               (str-concat "## " s "\n\n" content)))
            sections))))
 
-;; 节点5: 合并最终文章
+;; 拼接标题 + 所有章节为完整文章
 (define (build-article ctx)
   (let [[title (get ctx "title")]]
     (let [[articles (get ctx "articles")]]
@@ -46,25 +92,23 @@
         (str-concat "# " title "\n\n"
           (str-join "\n\n" articles))))))
 
-;; ---------- 第二步：定义工作流主函数 ----------
+
+;; ------------------------------------------------------------
+;; 3. 主工作流
+;;    reduce 将节点列表串联：每个节点的输出是下一个的输入
+;; ------------------------------------------------------------
+
 (define (run-workflow ctx)
   (reduce (lambda [c f] (f c)) ctx
     [input-data generate-outline parse-outline expand-sections build-article]))
 
-;; ---------- 第三步：执行工作流 ----------
-(print "=== 执行文章生成工作流 ===")
+
+;; ------------------------------------------------------------
+;; 4. 执行
+;; ------------------------------------------------------------
+
+(print ">>> 执行文章生成工作流（pipeline 模式）")
 (let [[result (run-workflow (dict))]]
   (print "")
-  (print "=== 生成的文章 ===")
+  (print ">>> 生成的文章：")
   (print (get result "final")))
-
-(print "")
-(print "=== 简洁优雅的主函数定义 ===")
-(print "整个工作流只有一行:")
-(print "")
-(print "  (define (run-workflow ctx)")
-(print "    (reduce (lambda [c f] (f c)) ctx")
-(print "      [input-data generate-outline parse-outline")
-(print "       expand-sections build-article]))")
-(print "")
-(print "这就是函数式编程的优雅：列表即工作流定义!")
