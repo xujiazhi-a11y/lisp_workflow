@@ -20,6 +20,7 @@ from typing import Any, Callable, List, Dict, Optional
 
 # 基准路径（脚本所在目录）
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+_loaded_files = set()
 
 # ============================================================
 # 导入工作流模块
@@ -89,6 +90,14 @@ KW_REDUCE = to_symbol('reduce')
 KW_FILTER = to_symbol('filter')
 KW_LET = to_symbol('let')
 
+# 中文工作流保留字
+KW_映射 = to_symbol('映射')
+KW_归约 = to_symbol('归约')
+KW_过滤 = to_symbol('过滤')
+KW_令 = to_symbol('令')
+KW_LOAD = to_symbol('load')
+KW_引入 = to_symbol('引入')
+
 # 程序终止符
 EOF = Symbol('#<eof-object>')
 
@@ -113,12 +122,11 @@ class Tokenizer:
                     return EOF
 
             # 替换阶段
-            self.line = re.sub('【', ' ( ', self.line)
-            self.line = re.sub('】', ' ) ', self.line)
-            self.line = re.sub(r'\“', '"', self.line)
-            self.line = re.sub(r'\”', '"', self.line)
-            self.line = re.sub(r'；', ';', self.line)
-            self.line = re.sub(r'（.*?）', '', self.line)
+            self.line = self.line.replace('【', ' ( ')
+            self.line = self.line.replace('】', ' ) ')
+            self.line = self.line.replace('“', '”')
+            self.line = self.line.replace('”', '”')
+            self.line = self.line.replace('；', ';')
 
             # 跳过空行
             if not self.line.strip():
@@ -127,8 +135,12 @@ class Tokenizer:
 
             # === 首先检查特殊字符 ===
             first_char = self.line[0]
-            if first_char in "()'`[],[":
+            if first_char in "()'`[]," or first_char == '（' or first_char == '）':
                 self.line = self.line[1:]
+                if first_char == '（':
+                    return '('
+                elif first_char == '）':
+                    return ')'
                 return first_char
 
             # === 跳过开头空白 ===
@@ -207,7 +219,7 @@ class Tokenizer:
             # === 解析标识符 ===
             if first_char.isalpha():
                 i = 1
-                while i < len(self.line) and not self.line[i].isspace() and self.line[i] not in "()'`,\";{}[]":
+                while i < len(self.line) and not self.line[i].isspace() and self.line[i] not in "()'`,\";{}[]" and self.line[i] not in '（）':
                     i += 1
                 token = self.line[:i]
                 self.line = self.line[i:]
@@ -215,7 +227,7 @@ class Tokenizer:
 
             # === 解析其他标识符 ===
             i = 1
-            while i < len(self.line) and not self.line[i].isspace() and self.line[i] not in "()'`,\";{}[]":
+            while i < len(self.line) and not self.line[i].isspace() and self.line[i] not in "()'`,\";{}[]" and self.line[i] not in '（）':
                 i += 1
             token = self.line[:i]
             self.line = self.line[i:]
@@ -265,21 +277,14 @@ class Tokenizer:
 
 def parse(tokens: Tokenizer):
     """解析token流为AST"""
-    # 标记列表是否来自方括号（作为数据）
-    DATA_LIST_MARKER = '__data__'
 
     def read(token):
         if token == '(' or token == '[':
-            # 支持方括号作为列表边界
             close = ']' if token == '[' else ')'
-            is_data = (token == '[')
             lst = []
             while True:
                 token = tokens.next_token()
                 if token == close:
-                    # 如果来自方括号，标记为数据列表
-                    if is_data:
-                        return [DATA_LIST_MARKER] + lst
                     return lst
                 elif str(token) == '#<eof-object>':
                     raise SyntaxError('程序异常终止')
@@ -297,13 +302,10 @@ def parse(tokens: Tokenizer):
         return EOF
     if next_token == '(' or next_token == '[':
         close = ']' if next_token == '[' else ')'
-        is_data = (next_token == '[')
         lst = []
         while True:
             token = tokens.next_token()
             if token == close:
-                if is_data:
-                    return [DATA_LIST_MARKER] + lst
                 return lst
             elif str(token) == '#<eof-object>':
                 raise SyntaxError('程序异常终止')
@@ -406,6 +408,14 @@ class Procedure:
 # 内置函数定义
 # ============================================================
 
+def _template_format(template, *args):
+    if '{{' in template:
+        result = template
+        for i in range(0, len(args) - 1, 2):
+            result = result.replace('{{' + str(args[i]) + '}}', str(args[i + 1]))
+        return result
+    return template % args
+
 def make_global_env():
     """创建全局环境"""
     env = Env()
@@ -480,7 +490,7 @@ def make_global_env():
         'str-starts?': lambda prefix, s: s.startswith(prefix),
         'str-ends?': lambda suffix, s: s.endswith(suffix),
         'str-contains?': lambda substr, s: substr in s,
-        'format': lambda template, *args: template % args if '%' in template else template.format(*args),
+        'format': lambda template, *args: _template_format(template, *args),
         
         # 打印输出
         'print': lambda *args: print(' '.join(to_lisp_str(x) if not isinstance(x, str) else x for x in args)),
@@ -511,24 +521,15 @@ def make_global_env():
     def lisp_pipe(init, *fns):
         """pipe: 管道操作，值依次流经各函数"""
         result = init
-        DATA_LIST_MARKER = '__data__'
         for fn in fns:
-            if isinstance(fn, list) and len(fn) > 0 and fn[0] == DATA_LIST_MARKER:
-                # 移除标记
-                fn = fn[1:]
             result = fn(result)
         return result
-    
+
     def lisp_threaded(init, *forms):
         """->: 线程宏，将值作为第一个参数传入后续每个表达式"""
         result = init
-        DATA_LIST_MARKER = '__data__'
         for form in forms:
             if isinstance(form, list):
-                # 检查是否是带 __data__ 标记的列表
-                if len(form) > 0 and form[0] == DATA_LIST_MARKER:
-                    # 移除标记
-                    form = form[1:]
                 if len(form) > 0:
                     # (f args...) -> (f result args...)
                     fn = evaluate(form[0], env)
@@ -639,6 +640,63 @@ def feishu_send(title, content):
 
 GLOBAL_ENV['send-to-feishu'] = feishu_send
 
+# ============================================================
+# 中文别名（汉化兼容层）
+# ============================================================
+
+_CN_ALIASES = {
+    # 输出
+    '打印': 'print',
+    '输出': 'print',
+    # 字符串
+    '格式化': 'format',
+    '文本拼接': 'str-concat',
+    '文本连接': 'str-join',
+    '文本裁剪': 'str-trim',
+    '文本包含': 'str-contains?',
+    '文本开头': 'str-starts?',
+    '文本结尾': 'str-ends?',
+    '文本替换': 'str-replace',
+    '文本分割': 'str-split',
+    '转文本': 'str',
+    # 列表
+    '序列': 'list',
+    '长度': 'length',
+    '追加': 'append',
+    '反转': 'reverse',
+    '前项': 'car',
+    '后项': 'cdr',
+    '序对': 'cons',
+    # 类型判断
+    '为空?': 'null?',
+    '是列表?': 'list?',
+    '是数字?': 'number?',
+    '是文本?': 'string?',
+    # 逻辑
+    '与': 'and',
+    '或': 'or',
+    '非': 'not',
+    # 数学
+    '取余': 'mod',
+    # I/O
+    '读文件': 'read-file',
+    '写文件': 'write-file',
+    # 字典
+    '字典': 'dict',
+    '取值': 'get',
+    '赋值': 'put',
+    # 工作流标准库
+    '调用模型': 'call-llm',
+    '去除思考': 'remove-think',
+    '解析JSON': 'parse-json',
+    '转JSON': 'to-json',
+    '提取JSON': 'extract-json',
+}
+
+for cn_name, en_name in _CN_ALIASES.items():
+    if en_name in GLOBAL_ENV:
+        GLOBAL_ENV[to_symbol(cn_name)] = GLOBAL_ENV[en_name]
+
 
 # ============================================================
 # 求值器
@@ -662,26 +720,6 @@ def evaluate(exp, env: Env = GLOBAL_ENV):
     # 空列表返回 None
     if len(exp) == 0:
         return None
-
-    # ========== 数据列表（来自方括号） ==========
-    # 检查是否是标记为数据的列表（如 [1 2 3]）
-    DATA_LIST_MARKER = '__data__'
-    if len(exp) > 0 and exp[0] == DATA_LIST_MARKER:
-        # 返回列表内容（去掉标记）
-        # 需要递归移除所有层的 __data__ 标记
-        def unwrap_data_list(lst):
-            result = []
-            for item in lst:
-                if isinstance(item, list) and len(item) > 0 and item[0] == DATA_LIST_MARKER:
-                    # 这个元素本身也是来自方括号，递归处理
-                    result.append(unwrap_data_list(item[1:]))
-                elif isinstance(item, list) and len(item) > 0:
-                    # 检查是否有深层的 __data__ 标记（如 lambda 参数中的）
-                    result.append(unwrap_data_list(item))
-                else:
-                    result.append(item)
-            return result
-        return unwrap_data_list(exp[1:])
 
     # ========== 特殊形式 ==========
 
@@ -711,7 +749,19 @@ def evaluate(exp, env: Env = GLOBAL_ENV):
             _, name, value = exp
             env[name] = evaluate(value, env)
         return None
-    
+
+    # load / 引入
+    if op == KW_LOAD or op == KW_引入:
+        filepath = evaluate(exp[1], env)
+        resolved = os.path.join(BASE_DIR, filepath) if not os.path.isabs(filepath) else filepath
+        resolved = os.path.normpath(resolved)
+        if resolved not in _loaded_files:
+            _loaded_files.add(resolved)
+            with open(resolved, 'r', encoding='utf-8') as f:
+                code = f.read()
+            run(code, env)
+        return None
+
     # set! / 赋
     if op == KW_SET or op == KW_赋:
         _, var, val = exp
@@ -721,23 +771,10 @@ def evaluate(exp, env: Env = GLOBAL_ENV):
     # lambda / 道
     if op == KW_LAMBDA or op == KW_道:
         _, params, *body = exp
-        # 支持方括号参数: (lambda [x y] ...) 或 (lambda (x y) ...)
-        # 移除 __data__ 标记
-        DATA_LIST_MARKER = '__data__'
-        if isinstance(params, list) and len(params) > 0 and params[0] == DATA_LIST_MARKER:
-            params = params[1:]  # 移除标记
         if isinstance(params, list):
-            # 参数已经是列表（如来自圆括号解析）
             params = [to_symbol(str(p)) if isinstance(p, Symbol) else to_symbol(p) for p in params]
         elif isinstance(params, Symbol):
-            s = str(params)
-            if s.startswith('[') and s.endswith(']'):
-                # 解析 [x y z] 为参数列表
-                inner = s[1:-1].strip()
-                if inner:
-                    params = [to_symbol(p.strip()) for p in inner.split() if p.strip()]
-                else:
-                    params = []
+            params = [params]
         body = body[0] if len(body) == 1 else [KW_BEGIN] + body
         return Procedure(params, body, env)
     
@@ -748,41 +785,18 @@ def evaluate(exp, env: Env = GLOBAL_ENV):
             result = evaluate(e, env)
         return result
     
-    # let: (let [[x 1] [y 2]] body1 body2 ...)
-    # 支持方括号绑定语法: (let [[name value] ...] body...)
-    if op == KW_LET:
+    # let / 令: (let ((x 1) (y 2)) body ...)
+    if op == KW_LET or op == KW_令:
         _, bindings, *bodies = exp
-        # 处理绑定列表：可能是 [name value] 或 (name value)
-        # 如果 bindings 本身带有 __data__ 标记，需要移除
-        DATA_LIST_MARKER = '__data__'
-        if isinstance(bindings, list) and len(bindings) > 0 and bindings[0] == DATA_LIST_MARKER:
-            # bindings 来自方括号解析：['__data__', [binding1], [binding2], ...]
-            binding_list = bindings[1:]  # 移除标记
-        else:
-            binding_list = bindings
 
-        # 创建新的环境层
         new_env = Env((), (), env)
 
-        # 逐个处理绑定，让后续绑定能引用前面的绑定
-        for b in binding_list:
-            # 检查是否是带 __data__ 标记的绑定（来自方括号）
-            if isinstance(b, list) and len(b) > 0 and b[0] == DATA_LIST_MARKER:
-                # 格式: ['__data__', name, value]
-                # 移除标记，取 name 和 value
-                if len(b) >= 3:
-                    name = b[1]
-                    value = evaluate(b[2], new_env)
-                    new_env[name] = value
-                elif len(b) == 2:
-                    new_env[b[1]] = None
-            elif isinstance(b, list) and len(b) >= 2:
-                # 普通绑定 (name value)
+        for b in bindings:
+            if isinstance(b, list) and len(b) >= 2:
                 name = b[0]
                 value = evaluate(b[1], new_env)
                 new_env[name] = value
             elif isinstance(b, list) and len(b) == 1:
-                # 单元素列表
                 new_env[b[0]] = None
 
         # 执行所有 body 表达式，返回最后一个
@@ -820,37 +834,32 @@ def evaluate(exp, env: Env = GLOBAL_ENV):
                 fn = evaluate(form, env)
                 result = fn(result)
         return result
-    
-    # map: (map fn list)
-    if op == KW_MAP:
+
+    # map / 映射: (map fn list)
+    if op == KW_MAP or op == KW_映射:
         _, fn_exp, lst_exp = exp
         fn = evaluate(fn_exp, env)
         lst = evaluate(lst_exp, env)
         return [fn(x) for x in lst]
-    
-    # reduce: (reduce fn init list)
-    if op == KW_REDUCE:
+
+    # reduce / 归约: (reduce fn init list)
+    if op == KW_REDUCE or op == KW_归约:
         _, fn_exp, init_exp, lst_exp = exp
         fn = evaluate(fn_exp, env)
         init = evaluate(init_exp, env)
         lst = evaluate(lst_exp, env)
-        # 转换列表中的 Symbol 为对应的值
-        lst = [env.find(x)[x] if isinstance(x, Symbol) else x for x in lst]
         return functools.reduce(fn, lst, init)
-    
-    # filter: (filter fn list)
-    if op == KW_FILTER:
+
+    # filter / 过滤: (filter fn list)
+    if op == KW_FILTER or op == KW_过滤:
         _, fn_exp, lst_exp = exp
         fn = evaluate(fn_exp, env)
         lst = evaluate(lst_exp, env)
         return [x for x in lst if fn(x)]
     
     # ========== 函数调用 ==========
-    # 处理函数调用
     proc = evaluate(exp[0], env)
-    # 如果 proc 是 lambda 表达式（列表），先求值
     if isinstance(proc, list) and len(proc) > 0:
-        DATA_LIST_MARKER = '__data__'
         if isinstance(proc[0], Symbol) and proc[0] == KW_LAMBDA:
             proc = evaluate(proc, env)
     args = [evaluate(arg, env) for arg in exp[1:]]
