@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+    <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate">
+    <title>Lisp Workflow</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/codemirror@5.65.16/lib/codemirror.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/codemirror@5.65.16/lib/codemirror.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/codemirror@5.65.16/addon/edit/matchbrackets.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/codemirror@5.65.16/addon/edit/closebrackets.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/dompurify@3.0.6/dist/purify.min.js"></script>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <!-- Title Bar -->
+    <div class="titlebar">
+        <h1>Lisp Workflow</h1>
+        <span class="mobile-badge" id="mobileBadge">移动版</span>
+        <span class="status-badge" id="status">...</span>
+        <button class="titlebar-icon" id="themeBtn" onclick="toggleTheme()" title="切换主题">&#9788;</button>
+        <span class="state-dot idle" id="mobileDot"></span>
+        <div class="spacer"></div>
+        <button class="mobile-run-btn" id="mobileRunBtn" onclick="runCode()">&#9654; 运行</button>
+        <button class="mobile-stop-btn" id="mobileStopBtn" onclick="stopCode()">&#9724; 停止</button>
+        <button class="titlebar-icon mobile-settings-btn m-icon-btn" id="mobileSettingsBtn" onclick="openMobileSettings()" title="设置" aria-label="设置"><span class="m-icon"><i data-lucide="settings"></i></span></button>
+        <div class="key-group">
+            <input type="password" id="apiKeyInput" placeholder="DeepSeek API Key">
+            <button onclick="toggleKeyVisibility()" title="显示/隐藏">&#128065;</button>
+            <button class="set" id="keySetBtn" onclick="setApiKey()">设置</button>
+            <button id="keyClearBtn" onclick="clearApiKey()" style="display:none">清除</button>
+        </div>
+    </div>
+
+    <!-- Sidebar -->
+    <div class="sidebar">
+        <div class="mobile-panel-header">
+            <div>
+                <div class="mph-title">文件管理</div>
+                <div class="mph-sub">点击文件打开编辑</div>
+            </div>
+            <div class="mobile-header-actions">
+                <button class="mobile-icon-btn m-icon-btn" onclick="startCreateIn('','file')" title="新建文件" aria-label="新建文件"><span class="m-icon"><i data-lucide="file-plus"></i></span></button>
+                <button class="mobile-icon-btn m-icon-btn" onclick="startCreateIn('','dir')" title="新建文件夹" aria-label="新建文件夹"><span class="m-icon"><i data-lucide="folder-plus"></i></span></button>
+            </div>
+        </div>
+        <div class="sidebar-header desktop-only">
+            <span>Explorer</span>
+            <span>
+                <button class="new-btn" onclick="collapseAll()" title="全部折叠">⊟</button>
+                <button class="new-btn" onclick="expandAll()" title="全部展开">⊞</button>
+                <button class="new-btn" onclick="startCreateIn('','file')" title="新建文件">📄+</button>
+                <button class="new-btn" onclick="startCreateIn('','dir')" title="新建文件夹">📁+</button>
+            </span>
+        </div>
+        <div class="file-list" id="fileList"></div>
+        <div class="sidebar-footer">
+            <button type="button" class="m-btn-secondary" onclick="startCreateIn('','file')"><span class="m-icon m-icon-sm"><i data-lucide="file-plus"></i></span><span>新建文件</span></button>
+            <button type="button" class="m-btn-secondary" onclick="startCreateIn('','dir')"><span class="m-icon m-icon-sm"><i data-lucide="folder-plus"></i></span><span>新建文件夹</span></button>
+        </div>
+    </div>
+
+    <!-- Editor -->
+    <div class="editor-area">
+        <div class="mobile-editor-header">
+            <div class="meh-title" id="mobileFileName">未打开文件</div>
+            <div class="mobile-header-actions">
+                <button class="mobile-icon-btn primary" onclick="saveFile()">保存</button>
+            </div>
+        </div>
+        <div class="editor-actions">
+            <button class="btn-run" id="runBtn" onclick="runCode()">&#9654; 运行</button>
+            <button class="btn-stop" id="stopBtn" onclick="stopCode()">&#9724; 停止</button>
+        </div>
+        <textarea id="codeArea">;; 点击左侧文件打开</textarea>
+    </div>
+
+    <!-- Output -->
+    <div class="output-area">
+        <div class="mobile-output-header">
+            <div>
+                <div class="moh-title" id="mobileExecStatus">就绪</div>
+                <div class="mph-sub" id="mobileExecTime">0.0s</div>
+            </div>
+            <div class="mobile-header-actions">
+                <button class="mobile-icon-btn" id="mobileMdBtn" onclick="toggleMarkdownMode()">MD</button>
+                <button class="mobile-icon-btn danger" onclick="clearConsole()">清空</button>
+            </div>
+        </div>
+        <div class="console-output" id="consoleOutput"></div>
+        <div class="console-input-row" id="consoleInputRow">
+            <span class="input-prompt" id="inputPrompt"></span>
+            <input id="consoleInput" placeholder="输入内容后按回车..." />
+            <button onclick="submitInput()">确认</button>
+        </div>
+    </div>
+
+    <!-- Status Bar -->
+    <div class="statusbar">
+        <span class="sb-item" id="sbFile">未打开文件</span>
+        <span class="sb-item" id="sbCursor">行 1, 列 1</span>
+        <span class="sb-spacer"></span>
+        <span class="sb-item"><span class="state-dot idle" id="stateDot"></span></span>
+        <span class="sb-item" id="execTime">0.0s</span>
+        <button id="mdModeBtn" onclick="toggleMarkdownMode()">MD: ON</button>
+    </div>
+
+    <!-- Mobile Tabs -->
+    <div class="mobile-tabs">
+        <button class="tab-btn" id="tabExplorer" onclick="switchTab('explorer')" aria-label="文件">
+            <span class="m-icon m-icon-tab"><i data-lucide="folder"></i></span>
+            <span class="tab-label">文件</span>
+        </button>
+        <button class="tab-btn" id="tabEditor" onclick="switchTab('editor')" aria-label="编辑">
+            <span class="m-icon m-icon-tab"><i data-lucide="file-code"></i></span>
+            <span class="tab-label">编辑</span>
+        </button>
+        <button class="tab-btn" id="tabOutput" onclick="switchTab('output')" aria-label="输出">
+            <span class="tab-badge" id="outputTabBadge"></span>
+            <span class="m-icon m-icon-tab"><i data-lucide="terminal"></i></span>
+            <span class="tab-label">输出</span>
+        </button>
+    </div>
+
+    <!-- Mobile FAB Run/Stop -->
+    <button class="mobile-fab hidden" id="mobileFab" onclick="isRunning ? stopCode() : runCode()" aria-label="运行">
+        <span class="mobile-fab-icon m-icon m-icon-fab" id="mobileFabIcon"><i data-lucide="play"></i></span>
+    </button>
+
+    <!-- Mobile Input Bottom Sheet -->
+    <div class="mobile-input-sheet" id="mobileInputSheet">
+        <div class="mobile-input-sheet-content">
+            <div class="mobile-input-prompt" id="mobileInputPrompt">请输入</div>
+            <input type="text" id="mobileConsoleInput" placeholder="输入内容..." autocomplete="off" />
+            <button type="button" class="mobile-input-submit" onclick="submitInput()">确认</button>
+        </div>
+    </div>
+
+    <!-- Mobile File Action Sheet -->
+    <div class="mobile-action-sheet" id="mobileActionSheet">
+        <div class="mobile-action-sheet-overlay" onclick="closeMobileActionSheet()"></div>
+        <div class="mobile-action-sheet-content">
+            <div class="mobile-action-sheet-title" id="mobileActionTitle"></div>
+            <div id="mobileActionItems"></div>
+            <button class="mobile-action-cancel" onclick="closeMobileActionSheet()">取消</button>
+        </div>
+    </div>
+
+    <!-- Mobile Settings Modal -->
+    <div class="mobile-settings-modal" id="mobileSettingsModal">
+        <div class="mobile-settings-overlay" onclick="closeMobileSettings()"></div>
+        <div class="mobile-settings-content">
+            <div class="mobile-settings-header">
+                <span>设置</span>
+                <button class="m-icon-btn" onclick="closeMobileSettings()" aria-label="关闭"><span class="m-icon"><i data-lucide="x"></i></span></button>
+            </div>
+            <div class="mobile-settings-body">
+                <div class="mobile-settings-section">
+                    <div class="mobile-settings-section-title">外观</div>
+                    <div class="mobile-settings-row">
+                        <label>深色 / 浅色主题</label>
+                        <button class="toggle-btn" id="mobileThemeBtn" onclick="toggleTheme()">切换</button>
+                    </div>
+                    <div class="mobile-settings-row">
+                        <label>Markdown 渲染</label>
+                        <button class="toggle-btn on" id="mobileMdToggle" onclick="toggleMarkdownMode()">ON</button>
+                    </div>
+                </div>
+                <div class="mobile-settings-section">
+                    <div class="mobile-settings-section-title">API Key</div>
+                    <p class="mobile-settings-hint" id="mobileKeyHint">未设置 API Key</p>
+                    <div class="mobile-key-row">
+                        <input type="password" id="mobileApiKeyInput" placeholder="DeepSeek API Key" />
+                        <button type="button" class="mobile-key-eye m-icon-btn" onclick="toggleMobileKeyVisibility()" aria-label="显示密钥"><span class="m-icon"><i data-lucide="eye"></i></span></button>
+                    </div>
+                    <div class="mobile-key-actions">
+                        <button class="mobile-key-set" onclick="setMobileApiKey()">设 置</button>
+                        <button class="mobile-key-clear" id="mobileKeyClearBtn" onclick="clearMobileApiKey()">清 除</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/lucide@0.469.0/dist/umd/lucide.min.js"></script>
+    <script src="/static/app.js"></script>
+</body>
+</html>

@@ -60,8 +60,8 @@
 ;; 对单个章节调用 LLM 扩写
 (define (expand-chapter chapter-name)
   (print "  正在扩写章节: " chapter-name "...")
-  (let [[content (remove-think
-                   (call-llm (format expand-prompt-template title chapter-name)))]]
+  (let ((content (remove-think
+                   (call-llm (format expand-prompt-template title chapter-name)))))
     (str-concat "## " chapter-name "\n\n" content)))
 
 

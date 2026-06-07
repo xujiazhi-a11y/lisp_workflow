@@ -1,0 +1,10 @@
+py/.user_config.json
+*.user_config.json
+.env
+.env.*
+*.zip
+lisp-workflow.zip
+py/.preview_cache/
+
+# 本地运行时数据（含用户搜索记录，勿提交）
+py/examples/搜索历史.json

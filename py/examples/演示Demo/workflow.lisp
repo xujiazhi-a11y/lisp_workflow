@@ -59,13 +59,13 @@
 
 ;; 调用 LLM 生成大纲文本
 (define (generate-outline ctx)
-  (let [[prompt (format outline-prompt-template (get ctx "title"))]]
+  (let ((prompt (format outline-prompt-template (get ctx "title"))))
     (print ">>> 调用大模型生成大纲...")
     (put ctx "outline" (call-llm prompt))))
 
 ;; 解析大纲 JSON，失败则使用默认章节
 (define (parse-outline ctx)
-  (let [[parsed (extract-json (get ctx "outline"))]]
+  (let ((parsed (extract-json (get ctx "outline"))))
     (print ">>> 解析大纲...")
     (put ctx "sections"
       (if (null? parsed)
@@ -74,19 +74,19 @@
 
 ;; 逐章调用 LLM 扩写
 (define (expand-sections ctx)
-  (let [[sections (get ctx "sections")]]
+  (let ((sections (get ctx "sections")))
     (print ">>> 调用大模型扩写章节...")
     (put ctx "articles"
-      (map (lambda [s]
-             (let [[content (remove-think
-                    (call-llm (format expand-prompt-template s)))]]
+      (map (lambda (s)
+             (let ((content (remove-think
+                    (call-llm (format expand-prompt-template s)))))
                (str-concat "## " s "\n\n" content)))
            sections))))
 
 ;; 拼接标题 + 所有章节为完整文章
 (define (build-article ctx)
-  (let [[title (get ctx "title")]]
-    (let [[articles (get ctx "articles")]]
+  (let ((title (get ctx "title")))
+    (let ((articles (get ctx "articles")))
       (print ">>> 生成最终文章...")
       (put ctx "final"
         (str-concat "# " title "\n\n"
@@ -99,8 +99,8 @@
 ;; ------------------------------------------------------------
 
 (define (run-workflow ctx)
-  (reduce (lambda [c f] (f c)) ctx
-    [input-data generate-outline parse-outline expand-sections build-article]))
+  (reduce (lambda (c f) (f c)) ctx
+    (list input-data generate-outline parse-outline expand-sections build-article)))
 
 
 ;; ------------------------------------------------------------
@@ -108,7 +108,7 @@
 ;; ------------------------------------------------------------
 
 (print ">>> 执行文章生成工作流（pipeline 模式）")
-(let [[result (run-workflow (dict))]]
+(let ((result (run-workflow (dict))))
   (print "")
   (print ">>> 生成的文章：")
   (print (get result "final")))

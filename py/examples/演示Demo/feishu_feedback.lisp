@@ -58,7 +58,7 @@
 
 ;; 判断负面反馈类型：返回 "物流慢" / "质量差" / "其它"
 (define (classify-issue feedback)
-  (let [[raw (str-trim (call-llm (format category-prompt feedback)))]]
+  (let ((raw (str-trim (call-llm (format category-prompt feedback)))))
     (if (str-contains? "物流" raw) "物流慢"
       (if (str-contains? "质量" raw) "质量差"
         "其它"))))
@@ -89,7 +89,7 @@
 
   ;; Step 1: 情感分类
   (print ">>> 情感分类...")
-  (let [[sentiment (classify-sentiment feedback)]]
+  (let ((sentiment (classify-sentiment feedback)))
     (print "  结果: " sentiment)
 
     ;; Step 2: 分流处理
@@ -99,7 +99,7 @@
         (notify-positive feedback))
       (begin
         (print ">>> 细分问题类型...")
-        (let [[category (classify-issue feedback)]]
+        (let ((category (classify-issue feedback)))
           (print "  类型: " category)
           (print ">>> 发送负向通知...")
           (notify-negative feedback category))))))
