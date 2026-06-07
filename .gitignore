@@ -1,0 +1,5 @@
+py/.user_config.json
+*.user_config.json
+*.zip
+lisp-workflow.zip
+py/.preview_cache/

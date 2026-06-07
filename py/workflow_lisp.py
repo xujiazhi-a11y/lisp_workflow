@@ -97,6 +97,10 @@ KW_过滤 = to_symbol('过滤')
 KW_令 = to_symbol('令')
 KW_LOAD = to_symbol('load')
 KW_引入 = to_symbol('引入')
+KW_OR = to_symbol('or')
+KW_AND = to_symbol('and')
+KW_或 = to_symbol('或')
+KW_与 = to_symbol('与')
 
 # 程序终止符
 EOF = Symbol('#<eof-object>')
@@ -336,10 +340,13 @@ def atom(token: str):
         try:
             return float(token)
         except ValueError:
-            try:
-                return complex(token.replace('i', 'j', 1))
-            except ValueError:
-                return to_symbol(token)
+            # 复数: 仅当 token 以数字开头或形如 "数字+i" 时才尝试
+            if len(token) > 1 and 'i' in token and token[0].isdigit():
+                try:
+                    return complex(token.replace('i', 'j', 1))
+                except ValueError:
+                    pass
+            return to_symbol(token)
 
 # ============================================================
 # 环境与求值
@@ -416,6 +423,19 @@ def _template_format(template, *args):
         return result
     return template % args
 
+
+def _list_extend(first, rest):
+    """原地扩展列表，避免 O(n) 拷贝。与 put 一致采用可变语义。"""
+    if not isinstance(first, list):
+        first = [first]
+    for lst in rest:
+        if isinstance(lst, list):
+            first.extend(lst)
+        else:
+            first.append(lst)
+    return first
+
+
 def make_global_env():
     """创建全局环境"""
     env = Env()
@@ -454,12 +474,15 @@ def make_global_env():
         'first': lambda lst: lst[0],
         'rest': lambda lst: lst[1:],
         'length': len,
-        'append': lambda *lsts: sum(lsts, []),
+        'append': lambda first, *rest: _list_extend(first, rest),
         'reverse': lambda lst: lst[::-1],
         'nth': lambda n, lst: lst[n],
         'take': lambda n, lst: lst[:n],
         'drop': lambda n, lst: lst[n:],
-        
+        'sort': lambda fn, lst: sorted(lst, key=functools.cmp_to_key(fn)),
+        'member?': lambda item, lst: item in lst,
+        'to-number': lambda x: int(x) if isinstance(x, int) else (float(x) if isinstance(x, (float, str)) else 0),
+
         # 类型判断
         'null?': lambda x: x == [] or x is None,
         'list?': lambda x: isinstance(x, list),
@@ -685,6 +708,15 @@ _CN_ALIASES = {
     '字典': 'dict',
     '取值': 'get',
     '赋值': 'put',
+    '键集': 'keys',
+    '值集': 'values',
+    # 排序与成员
+    '排序': 'sort',
+    '包含?': 'member?',
+    '转数字': 'to-number',
+    '大写': 'str-upper',
+    '小写': 'str-lower',
+    '取前': 'take',
     # 工作流标准库
     '调用模型': 'call-llm',
     '去除思考': 'remove-think',
@@ -856,7 +888,24 @@ def evaluate(exp, env: Env = GLOBAL_ENV):
         fn = evaluate(fn_exp, env)
         lst = evaluate(lst_exp, env)
         return [x for x in lst if fn(x)]
-    
+
+    # or / 或: 短路求值，遇到真值立即返回
+    if op == KW_OR or op == KW_或:
+        for arg in exp[1:]:
+            val = evaluate(arg, env)
+            if val:
+                return val
+        return False
+
+    # and / 与: 短路求值，遇到假值立即返回
+    if op == KW_AND or op == KW_与:
+        val = True
+        for arg in exp[1:]:
+            val = evaluate(arg, env)
+            if not val:
+                return val
+        return val
+
     # ========== 函数调用 ==========
     proc = evaluate(exp[0], env)
     if isinstance(proc, list) and len(proc) > 0:
