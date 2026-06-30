@@ -17,7 +17,12 @@ def parse_json(text: str) -> Any:
     返回:
         Python 数据结构（dict/list/等）
     """
-    return json.loads(text)
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError as e:
+        raise ValueError(
+            f"JSON 解析失败：{e.msg}（第 {e.lineno} 行第 {e.colno} 列）"
+        ) from e
 
 
 def to_json(data: Any, indent: int = 2) -> str:

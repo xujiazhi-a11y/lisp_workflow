@@ -8,3 +8,18 @@ py/.preview_cache/
 
 # 本地运行时数据（含用户搜索记录，勿提交）
 py/examples/搜索历史.json
+
+# 日志与缓存
+*.log
+__pycache__/
+*.py[cod]
+
+# 编译产物
+*.o
+zhiyu-core/zhiyu
+
+# 本地调试输出
+py/output/
+py/page_debug.png
+py/data/
+py/.ark/

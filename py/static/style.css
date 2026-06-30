@@ -1290,3 +1290,76 @@ body.theme-light .statusbar { background: #007acc; }
     body.theme-light .tab-btn.active { color: var(--m-accent); }
     body.theme-light .mobile-fab { box-shadow: 0 4px 16px rgba(10, 132, 255, 0.35); }
 }
+
+/* ===== 跑前表单 ===== */
+.run-form {
+    border-bottom: 1px solid #333;
+    background: #252525;
+    flex-shrink: 0;
+}
+.run-form-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 12px;
+    cursor: pointer;
+    user-select: none;
+    background: #2a2a2a;
+}
+.run-form-title { font-weight: 600; color: #e0e0e0; font-size: 13px; }
+.run-form-toggle { background: none; border: 0; color: #aaa; font-size: 14px; cursor: pointer; }
+.run-form.collapsed .run-form-body { display: none; }
+.run-form-body { padding: 10px 12px 12px; display: grid; gap: 8px; }
+.run-form-row { display: flex; flex-direction: column; gap: 4px; }
+.run-form-row label { color: #aaa; font-size: 12px; }
+.run-form-row .req { color: #f55; }
+.run-form-row input[type=text], .run-form-row input[type=number] {
+    background: #1a1a1a; border: 1px solid #444; color: #e0e0e0;
+    padding: 6px 8px; border-radius: 4px; font-size: 13px; outline: none;
+}
+.run-form-row input:focus { border-color: #4a9eff; }
+.run-form-hint { color: #777; font-size: 11px; }
+.run-form-upload { display: flex; align-items: center; gap: 8px; }
+.run-form-upload-btn {
+    background: #3a3a3a; border: 1px solid #555; color: #e0e0e0;
+    padding: 5px 10px; border-radius: 4px; cursor: pointer; font-size: 12px;
+}
+.run-form-upload-btn:hover { background: #4a4a4a; }
+.run-form-upload-name { color: #888; font-size: 12px; flex: 1; word-break: break-all; }
+.run-form-preview { max-height: 60px; max-width: 80px; border-radius: 4px; display: none; }
+.run-form-preview.has { display: inline-block; }
+.run-form-actions { display: flex; gap: 8px; margin-top: 4px; }
+.run-form-apply, .run-form-clear {
+    padding: 6px 14px; border-radius: 4px; font-size: 12px; cursor: pointer; border: 1px solid #555;
+}
+.run-form-apply { background: #2d5d8a; color: #fff; border-color: #4a9eff; }
+.run-form-apply:hover { background: #3673ad; }
+.run-form-clear { background: #3a3a3a; color: #ccc; }
+.run-form-clear:hover { background: #4a4a4a; }
+
+/* ===== 交互卡：缩略图选择 / 视频历史版本 ===== */
+.interact-card {
+    margin: 6px 0; padding: 10px; background: #2a2a2a; border: 1px solid #444;
+    border-radius: 6px;
+}
+.interact-card-prompt { color: #e0e0e0; font-size: 13px; margin-bottom: 8px; }
+.interact-options { display: flex; flex-wrap: wrap; gap: 8px; }
+.interact-option {
+    background: #3a3a3a; border: 2px solid #555; color: #e0e0e0; padding: 6px 10px;
+    border-radius: 4px; cursor: pointer; font-size: 12px;
+    display: flex; flex-direction: column; align-items: center; gap: 4px;
+    min-width: 90px; transition: all 0.15s;
+}
+.interact-option:hover:not(:disabled) { border-color: #4a9eff; background: #3d4a5a; }
+.interact-option.selected { border-color: #4caf50; background: #2d4a32; }
+.interact-option:disabled { opacity: 0.4; cursor: wait; }
+.interact-option img, .interact-option video {
+    max-width: 120px; max-height: 80px; border-radius: 4px; background: #111;
+    display: block;
+}
+.interact-option-label { font-weight: 500; }
+.interact-status { color: #888; font-size: 12px; margin-top: 6px; font-style: italic; }
+
+/* 表单宿主：默认空容器，按需插入 */
+.run-form-host { flex-shrink: 0; }
+.run-form-host:empty { display: none; }

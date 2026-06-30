@@ -44,7 +44,7 @@ def call_llm(prompt: str, config: dict = None) -> str:
     
     if not api_key:
         # Mock 模式：返回模拟响应
-        return f"[MOCK LLM] 收到提示词: {prompt[:100]}{'...' if len(prompt) > 100 else ''}"
+        return f"[模拟 LLM] 收到提示词：{prompt[:100]}{'...' if len(prompt) > 100 else ''}"
     
     try:
         # 使用 OpenAI 兼容的 SDK
@@ -115,7 +115,7 @@ def call_llm_with_system(prompt: str, system_prompt: str, config: dict = None) -
     max_tokens = config.get("max_tokens", 4096)
     
     if not api_key:
-        raise ValueError("未设置 API Key")
+        raise ValueError("未设置 API 密钥")
     
     import openai
     

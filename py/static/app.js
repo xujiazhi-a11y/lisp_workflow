@@ -1,3 +1,214 @@
+// --- 跑前表单与交互渲染 ---
+var _refImageServerPath = null;
+
+// 需要跑前表单的脚本：文件路径或脚本首行包含此关键字时弹表单
+var RUN_FORM_SCRIPT_HINTS = [
+    "AI视频创作",
+    "AI 视频创作",
+    "ai-video", "ai_video", "aivideo"
+];
+
+// 判定当前代码是否需要跑前表单
+function needsRunForm(code) {
+    if (!code) return false;
+    var head = code.slice(0, 2000);
+    for (var i = 0; i < RUN_FORM_SCRIPT_HINTS.length; i++) {
+        if (head.indexOf(RUN_FORM_SCRIPT_HINTS[i]) !== -1) return true;
+    }
+    return false;
+}
+
+function ensureRunForm() {
+    var host = document.getElementById("runFormHost");
+    if (!host) return null;
+    if (host.querySelector(".run-form")) return host.querySelector(".run-form");
+    host.innerHTML =
+        '<div class="run-form" id="runForm">' +
+            '<div class="run-form-header">' +
+                '<span class="run-form-title">🎬 AI 视频创作 · 跑前配置</span>' +
+                '<button class="run-form-toggle" onclick="toggleRunForm()" title="折叠/展开">▾</button>' +
+            '</div>' +
+            '<div class="run-form-body" id="runFormBody">' +
+                '<div class="run-form-row">' +
+                    '<label>故事描述 <span class="req">*</span></label>' +
+                    '<input type="text" id="rfStory" placeholder="例如：小猫做饭" oninput="syncFormState()">' +
+                '</div>' +
+                '<div class="run-form-row">' +
+                    '<label>最终视频时长（秒）<span class="req">*</span></label>' +
+                    '<input type="number" id="rfDuration" min="1" max="300" value="10" oninput="syncFormState()">' +
+                    '<span class="run-form-hint">单段 5 秒，自动计算段数</span>' +
+                '</div>' +
+                '<div class="run-form-row">' +
+                    '<label>角色描述</label>' +
+                    '<input type="text" id="rfCharacter" placeholder="例如：一只可爱的暹罗猫，蓝眼睛" oninput="syncFormState()">' +
+                '</div>' +
+                '<div class="run-form-row">' +
+                    '<label>参考图 <span class="req">*</span></label>' +
+                    '<div class="run-form-upload">' +
+                        '<input type="file" id="rfImageFile" accept="image/*" style="display:none" onchange="onRefImageChange()">' +
+                        '<button class="run-form-upload-btn" onclick="document.getElementById(\'rfImageFile\').click()">📁 选择图片</button>' +
+                        '<span class="run-form-upload-name" id="rfImageName">未选择</span>' +
+                        '<img class="run-form-preview" id="rfImagePreview" alt="" />' +
+                    '</div>' +
+                '</div>' +
+                '<div class="run-form-actions">' +
+                    '<button class="run-form-apply" onclick="applyRunForm()">✓ 应用配置并运行</button>' +
+                    '<button class="run-form-clear" onclick="clearRunForm()">清空</button>' +
+                '</div>' +
+            '</div>' +
+        '</div>';
+    // 把已有值回填
+    if (_formState.story) document.getElementById("rfStory").value = _formState.story;
+    if (_formState.duration) document.getElementById("rfDuration").value = _formState.duration;
+    if (_formState.character) document.getElementById("rfCharacter").value = _formState.character;
+    if (_refImageServerPath) {
+        document.getElementById("rfImageName").textContent = _refImageServerPath;
+    }
+    return host.querySelector(".run-form");
+}
+
+function clearRunForm() {
+    var host = document.getElementById("runFormHost");
+    if (host) host.innerHTML = "";
+    _refImageServerPath = null;
+    _formState = { story: "", duration: 10, character: "", imagePath: null };
+}
+
+function toggleRunForm() {
+    var form = document.getElementById("runForm");
+    if (form) form.classList.toggle("collapsed");
+}
+
+function onRefImageChange() {
+    var inp = document.getElementById("rfImageFile");
+    var nameSpan = document.getElementById("rfImageName");
+    var preview = document.getElementById("rfImagePreview");
+    if (!inp || !inp.files || !inp.files[0]) return;
+    var f = inp.files[0];
+    nameSpan.textContent = "上传中...";
+    var fd = new FormData();
+    // 字段名用 files（后端 cgi.FieldStorage 按 'files' 读），并标记 purpose=ai_video
+    // 后端会存到 .ark/uploads/，返回 path，Lisp 脚本直接引用
+    fd.append("files", f, f.name);
+    fd.append("purpose", "ai_video");
+    fetch("/api/file/upload", { method: "POST", body: fd })
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+            if (d.status === "ok" && d.files && d.files.length > 0) {
+                _refImageServerPath = d.files[0];
+                _formState.imagePath = d.files[0];
+                nameSpan.textContent = d.files[0];
+                if (preview) {
+                    preview.src = URL.createObjectURL(f);
+                    preview.classList.add("has");
+                }
+                log("[图片] 已上传：" + d.files[0], "system");
+            } else {
+                nameSpan.textContent = "上传失败: " + (d.message || JSON.stringify(d));
+            }
+        })
+        .catch(function(e) { nameSpan.textContent = "上传失败: " + e.message; });
+}
+
+function applyRunForm() {
+    // 用户填完表单后点此按钮：折叠表单 + 触发 runCode（runCode 入口会做硬校验）
+    var form = document.getElementById("runForm");
+    if (form) form.classList.add("collapsed");
+    log("[表单] 已应用，开始执行", "system");
+    runCode();
+}
+
+// 全局状态：表单最新值（实时同步，不依赖"应用"按钮）
+var _formState = { story: "", duration: 10, character: "", imagePath: null };
+
+function syncFormState() {
+    var storyEl = document.getElementById("rfStory");
+    var durEl = document.getElementById("rfDuration");
+    var charEl = document.getElementById("rfCharacter");
+    if (storyEl) _formState.story = storyEl.value || "";
+    if (durEl) _formState.duration = parseInt(durEl.value, 10) || 0;
+    if (charEl) _formState.character = charEl.value || "";
+    if (_refImageServerPath) _formState.imagePath = _refImageServerPath;
+}
+
+// 把服务器返回的路径转为可访问的 URL
+function _toAssetUrl(p) {
+    if (!p) return "";
+    if (/^https?:\/\//.test(p)) return p;
+    if (p.startsWith("/")) return p;
+    // 相对 examples 目录的相对路径
+    return "/api/file/" + encodeURIComponent(p);
+}
+
+function renderInteract(payload) {
+    var out = document.getElementById("consoleOutput");
+    if (!out) return;
+    hideInput();
+    var card = document.createElement("div");
+    card.className = "interact-card";
+    var promptText = (payload.prompt || "请选择").replace(/↎/g, "\n");
+    var promptEl = document.createElement("div");
+    promptEl.className = "interact-card-prompt";
+    promptEl.textContent = promptText;
+    card.appendChild(promptEl);
+    var optsEl = document.createElement("div");
+    optsEl.className = "interact-options";
+    var status = document.createElement("div");
+    status.className = "interact-status";
+    card.appendChild(optsEl);
+    card.appendChild(status);
+
+    (payload.options || []).forEach(function(opt) {
+        var btn = document.createElement("button");
+        btn.className = "interact-option";
+        btn.disabled = false;
+        if (opt.image) {
+            var img = document.createElement("img");
+            img.src = _toAssetUrl(opt.image);
+            img.alt = opt.label || "";
+            btn.appendChild(img);
+        }
+        if (opt.video) {
+            var vid = document.createElement("video");
+            vid.src = _toAssetUrl(opt.video);
+            vid.muted = true; vid.playsInline = true; vid.loop = true;
+            btn.appendChild(vid);
+        }
+        var lbl = document.createElement("div");
+        lbl.className = "interact-option-label";
+        lbl.textContent = opt.label || opt.value || "";
+        btn.appendChild(lbl);
+        btn.onclick = function() {
+            if (btn.disabled) return;
+            var opts = optsEl.querySelectorAll(".interact-option");
+            opts.forEach(function(o) { o.disabled = true; });
+            btn.classList.add("selected");
+            status.textContent = "已选择：" + (opt.label || opt.value) + "，等待脚本继续...";
+            log("> " + (opt.label || opt.value), "text");
+            fetch("/api/input", { method: "POST", headers: {"Content-Type":"application/json"},
+                body: JSON.stringify({ input: opt.value, client_id: clientId }) })
+                .then(function(r) { return r.json(); })
+                .then(function(d) {
+                    if (d.status !== "ok") {
+                        status.textContent = "提交失败，请重试";
+                        opts.forEach(function(o) { o.disabled = false; });
+                        btn.classList.remove("selected");
+                    }
+                })
+                .catch(function(e) {
+                    status.textContent = "网络错误: " + e.message;
+                    opts.forEach(function(o) { o.disabled = false; });
+                    btn.classList.remove("selected");
+                });
+        };
+        optsEl.appendChild(btn);
+    });
+
+    out.appendChild(card);
+    out.scrollTop = out.scrollHeight;
+    setExecState("waiting");
+}
+
 // --- Theme ---
 (function() {
     var saved = localStorage.getItem("lisp-theme");
@@ -710,6 +921,8 @@ function openFile(name) {
     fetch("/api/file/" + encodeURIComponent(name)).then(function(r) { return r.json(); }).then(function(d) {
         editor.setValue(d.content); currentFile = name; sbFile.textContent = name; updateMobileFileName(); loadFileList();
         updateRunBtnVisibility(); updateFileLinks();
+        // 切换文件时清掉旧表单，让控制台回到基准状态
+        clearRunForm();
         if (isMobile()) switchTab('editor');
     });
 }
@@ -1153,6 +1366,8 @@ function handleSseData(data) {
         stepCount++; log(data.substring(8).replace(/↎/g, "\n"), "text");
     } else if (data.indexOf("__INPUT__:") === 0) {
         showInput(data.substring(10).replace(/↎/g, "\n"));
+    } else if (data.indexOf("__INTERACT__:") === 0) {
+        try { renderInteract(JSON.parse(data.substring(12))); } catch (e) { log("解析交互消息失败: " + e.message, "error"); }
     } else if (data.indexOf("__PROGRESS__:") === 0) {
         try { updateSearchProgress(JSON.parse(data.substring(12))); } catch (e) {}
     } else if (data.indexOf("__TORRENT__:") === 0) {
@@ -1167,11 +1382,56 @@ function handleSseData(data) {
 function runCode() {
     if (isRunning) return;
     hideInput();
+
+    var code = editor.getValue();
+    var requireForm = needsRunForm(code);
+
+    // === 跑前必填校验：仅在脚本需要表单时执行 ===
+    if (requireForm) {
+        ensureRunForm();
+        syncFormState();
+        var storyVal = _formState.story;
+        var durVal = _formState.duration;
+        var charVal = _formState.character;
+        var imgPath = _formState.imagePath || _refImageServerPath;
+        if (!imgPath) {
+            log("❌ 请先上传参考图", "error");
+            var f = document.getElementById("runForm"); if (f) f.classList.remove("collapsed");
+            return;
+        }
+        if (!storyVal.trim()) {
+            log("❌ 请填写故事描述", "error");
+            var f2 = document.getElementById("runForm"); if (f2) f2.classList.remove("collapsed");
+            return;
+        }
+        if (!durVal || durVal <= 0) {
+            log("❌ 请填写有效时长", "error");
+            return;
+        }
+        var segCount = Math.max(1, Math.ceil(durVal / 5));
+        var inputs = {
+            "参考图": imgPath,
+            "故事": storyVal.trim(),
+            "段数": segCount,
+            "角色": charVal.trim()
+        };
+    } else {
+        clearRunForm();
+        var inputs = null;
+    }
+
     sseLineBuffer = "";
     setRunning(true); clearConsole(); log(">>> 开始执行...", "system");
+    if (inputs) {
+        log("    故事: " + inputs["故事"] + "  时长: " + (durVal) + "s  段数: " + inputs["段数"], "text");
+        log("    参考图: " + inputs["参考图"], "text");
+    }
     abortController = new AbortController();
+
+    var payload = { code: code, markdown: markdownMode, client_id: clientId };
+    if (inputs) payload.inputs = inputs;
     fetch("/api/execute", { method: "POST", headers: {"Content-Type":"application/json"},
-        body: JSON.stringify({ code: editor.getValue(), markdown: markdownMode, client_id: clientId }),
+        body: JSON.stringify(payload),
         signal: abortController.signal
     }).then(function(response) {
         var reader = response.body.getReader(), decoder = new TextDecoder();

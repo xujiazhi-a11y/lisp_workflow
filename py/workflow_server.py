@@ -15,6 +15,7 @@ import threading
 import queue
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from socketserver import ThreadingMixIn
+from typing import Optional
 from urllib.parse import urlparse, parse_qs, unquote
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -26,6 +27,8 @@ import workflow_lisp
 _BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 _USER_CONFIG_PATH = os.path.join(_BASE_DIR, '.user_config.json')
 _server_api_key = ""
+_api_keys = {}
+_KNOWN_PROVIDERS = ("deepseek", "siliconflow", "kling", "zhipu")
 import uuid
 
 # ── 执行会话：每客户端绑定独立队列，全局仅允许一个活跃执行 ──
@@ -102,7 +105,7 @@ def _terminate_active_execution(join_timeout=3.0):
     set_cancel_check(lambda: (_get_active_session() is None) or _get_active_session().stopped())
 
 
-def _start_execution(client_id: str, code: str, markdown: bool = False):
+def _start_execution(client_id: str, code: str, markdown: bool = False, inputs: Optional[dict] = None):
     """终止旧执行并启动新会话。返回新 ExecutionSession。"""
     global _active_session
     _terminate_active_execution()
@@ -112,8 +115,13 @@ def _start_execution(client_id: str, code: str, markdown: bool = False):
     set_cancel_check(lambda: session.stopped())
 
     def _run():
+        global _active_session
         _exec_tls.session = session
         try:
+            # 注入运行时用户输入（角色图路径等），让 Lisp 端用 (取值 用户输入数据 "key") 读取
+            if inputs:
+                GLOBAL_ENV[to_symbol('client-input')] = inputs
+                GLOBAL_ENV[to_symbol('用户输入数据')] = inputs
             _execute_code(session, code)
         finally:
             if getattr(_exec_tls, "session", None) is session:
@@ -139,10 +147,62 @@ def _session_for_output():
 markdown_mode = False  # 保留变量供旧逻辑兼容（实际用 session.markdown）
 
 
+def _get_merged_api_keys():
+    """合并本地配置与环境变量中的 API Key。
+
+    Kling 现在拆成 kling_ak / kling_sk 两个独立字段，便于前端两输入框。
+    兼容旧的 kling="ak:sk" 写法。
+    """
+    keys = dict(_api_keys)
+    if not keys.get("deepseek"):
+        env_key = (
+            os.environ.get("DEEPSEEK_API_KEY")
+            or os.environ.get("OPENAI_API_KEY")
+            or ""
+        ).strip()
+        if env_key:
+            keys["deepseek"] = env_key
+    if not keys.get("siliconflow") and os.environ.get("SILICONFLOW_API_KEY"):
+        keys["siliconflow"] = os.environ["SILICONFLOW_API_KEY"].strip()
+    # Zhipu: 智谱清影 API Key
+    if not keys.get("zhipu") and os.environ.get("ZHIPU_API_KEY"):
+        keys["zhipu"] = os.environ["ZHIPU_API_KEY"].strip()
+    # Kling: 优先使用拆分字段，缺失时回退到合并字段/环境变量
+    if not (keys.get("kling_ak") and keys.get("kling_sk")):
+        # 回退路径 1: 旧 kling="ak:sk" 字段
+        legacy = (keys.get("kling") or "").strip()
+        if ":" in legacy and not (keys.get("kling_ak") and keys.get("kling_sk")):
+            ak, sk = (s.strip() for s in legacy.split(":", 1))
+            keys["kling_ak"] = ak
+            keys["kling_sk"] = sk
+        # 回退路径 2: 旧 KLING_API_KEY="ak:sk" 环境变量
+        if not (keys.get("kling_ak") and keys.get("kling_sk")):
+            env_legacy = os.environ.get("KLING_API_KEY", "").strip()
+            if ":" in env_legacy:
+                ak, sk = (s.strip() for s in env_legacy.split(":", 1))
+                keys["kling_ak"] = ak
+                keys["kling_sk"] = sk
+    # 回退路径 3: 新的 KLING_AK / KLING_SK 拆分环境变量
+    if not keys.get("kling_ak") and os.environ.get("KLING_AK"):
+        keys["kling_ak"] = os.environ["KLING_AK"].strip()
+    if not keys.get("kling_sk") and os.environ.get("KLING_SK"):
+        keys["kling_sk"] = os.environ["KLING_SK"].strip()
+    return keys
+
+
+def _mask_api_key(key):
+    if not key:
+        return ""
+    if len(key) <= 8:
+        return "****"
+    return key[:4] + "****" + key[-4:]
+
+
 def _make_llm_fn():
     """创建使用服务端 API Key 的 call-llm 函数"""
     from workflow.llm import call_llm
-    key = _server_api_key or os.environ.get("DEEPSEEK_API_KEY") or os.environ.get("OPENAI_API_KEY", "")
+    keys = _get_merged_api_keys()
+    key = keys.get("deepseek") or _server_api_key
     if key:
         return lambda prompt: call_llm(prompt, config={"api_key": key})
     return lambda prompt: call_llm(prompt)  # 无 key 时走 mock 模式
@@ -156,58 +216,154 @@ def update_llm_env():
     GLOBAL_ENV[to_symbol('调用模型')] = fn
 
 
-def _load_user_config():
-    """启动时从本地文件加载 API Key"""
-    global _server_api_key
+def _read_user_config_file():
     if not os.path.isfile(_USER_CONFIG_PATH):
-        return
+        return {}
     try:
         with open(_USER_CONFIG_PATH, 'r', encoding='utf-8') as f:
             data = json.load(f)
-        key = (data.get('api_key') or '').strip()
-        if key:
-            _server_api_key = key
-            masked = key[:4] + "****" + (key[-4:] if len(key) > 8 else "")
-            print(f"[Config] 已从本地加载 API Key ({masked})")
-    except Exception as e:
+        return data if isinstance(data, dict) else {}
+    except (json.JSONDecodeError, OSError) as e:
         print(f"[Config] 读取 .user_config.json 失败: {e}")
+        return {}
 
 
-def _save_user_config_api_key(api_key):
-    """将 API Key 写入本地配置文件"""
-    data = {}
-    if os.path.isfile(_USER_CONFIG_PATH):
-        try:
-            with open(_USER_CONFIG_PATH, 'r', encoding='utf-8') as f:
-                data = json.load(f)
-        except (json.JSONDecodeError, OSError):
-            data = {}
-    data['api_key'] = api_key
+def _write_user_config_file(data):
     with open(_USER_CONFIG_PATH, 'w', encoding='utf-8') as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
         f.write('\n')
 
 
-def _clear_user_config_api_key():
-    """从本地配置文件移除 api_key 字段"""
-    if not os.path.isfile(_USER_CONFIG_PATH):
-        return
-    try:
-        with open(_USER_CONFIG_PATH, 'r', encoding='utf-8') as f:
-            data = json.load(f)
-    except (json.JSONDecodeError, OSError):
-        return
-    data.pop('api_key', None)
-    if data:
-        with open(_USER_CONFIG_PATH, 'w', encoding='utf-8') as f:
-            json.dump(data, f, ensure_ascii=False, indent=2)
-            f.write('\n')
+def _sync_legacy_api_key_field(data):
+    """保持 api_key 与 deepseek 同步，兼容旧前端"""
+    deepseek = (data.get('api_keys') or {}).get('deepseek', '').strip()
+    if deepseek:
+        data['api_key'] = deepseek
     else:
+        data.pop('api_key', None)
+
+
+def _load_user_config():
+    """启动时从本地文件加载多 Provider API Key"""
+    global _server_api_key, _api_keys
+    data = _read_user_config_file()
+    if not data:
+        return
+
+    api_keys = data.get('api_keys') or {}
+    if not isinstance(api_keys, dict):
+        api_keys = {}
+
+    legacy = (data.get('api_key') or '').strip()
+    if legacy and not (api_keys.get('deepseek') or '').strip():
+        api_keys['deepseek'] = legacy
+
+    _api_keys = {
+        k: str(v).strip()
+        for k, v in api_keys.items()
+        if v and str(v).strip()
+    }
+    _server_api_key = _api_keys.get('deepseek', legacy)
+
+    if _api_keys:
+        providers = ', '.join(sorted(_api_keys.keys()))
+        print(f"[Config] 已加载 API 密钥：{providers}")
+
+
+def _save_provider_api_key(provider, api_key):
+    """按 provider 写入 API Key"""
+    global _server_api_key, _api_keys
+    provider = (provider or 'deepseek').strip().lower()
+    data = _read_user_config_file()
+    api_keys = data.get('api_keys') or {}
+    if not isinstance(api_keys, dict):
+        api_keys = {}
+    api_keys[provider] = api_key
+    data['api_keys'] = api_keys
+    _sync_legacy_api_key_field(data)
+    _write_user_config_file(data)
+
+    _api_keys = {
+        k: str(v).strip()
+        for k, v in api_keys.items()
+        if v and str(v).strip()
+    }
+    if provider == 'deepseek':
+        _server_api_key = api_key
+
+
+def _clear_provider_api_key(provider=None):
+    """清除指定 provider 的 API Key；无 provider 时清除 deepseek（兼容旧接口）"""
+    global _server_api_key, _api_keys
+    provider = (provider or 'deepseek').strip().lower()
+    data = _read_user_config_file()
+    api_keys = data.get('api_keys') or {}
+    if not isinstance(api_keys, dict):
+        api_keys = {}
+    api_keys.pop(provider, None)
+    if api_keys:
+        data['api_keys'] = api_keys
+    else:
+        data.pop('api_keys', None)
+    if provider == 'deepseek':
+        data.pop('api_key', None)
+    _sync_legacy_api_key_field(data)
+
+    if data:
+        _write_user_config_file(data)
+    elif os.path.isfile(_USER_CONFIG_PATH):
         os.remove(_USER_CONFIG_PATH)
+
+    _api_keys = {
+        k: str(v).strip()
+        for k, v in api_keys.items()
+        if v and str(v).strip()
+    }
+    if provider == 'deepseek':
+        _server_api_key = _api_keys.get('deepseek', '')
+
+
+def _config_api_keys_response():
+    merged = _get_merged_api_keys()
+    result = {}
+    for name in _KNOWN_PROVIDERS:
+        if name == 'kling':
+            # Kling 现在拆成 ak + sk，单独返回
+            ak = merged.get('kling_ak', '')
+            sk = merged.get('kling_sk', '')
+            result[name] = {
+                "set": bool(ak and sk),
+                "kling_ak": _mask_api_key(ak),
+                "kling_sk": _mask_api_key(sk),
+                "masked": f"{_mask_api_key(ak)} / {_mask_api_key(sk)}",
+            }
+        else:
+            key = merged.get(name, '')
+            result[name] = {
+                "set": bool(key),
+                "masked": _mask_api_key(key),
+            }
+    deepseek = merged.get('deepseek', '')
+    return {
+        "api_keys": result,
+        "api_key_set": bool(deepseek),
+        "masked_key": _mask_api_key(deepseek),
+    }
+
+
+def _save_user_config_api_key(api_key):
+    """兼容旧接口：写入 deepseek key"""
+    _save_provider_api_key('deepseek', api_key)
+
+
+def _clear_user_config_api_key():
+    """兼容旧接口：清除 deepseek key"""
+    _clear_provider_api_key('deepseek')
 
 
 # 飞书 Webhook 配置
-FEISHU_WEBHOOK = "https://open.feishu.cn/open-apis/bot/v2/hook/422435e3-a5eb-489d-b410-35e5293d3df6"
+import os
+FEISHU_WEBHOOK = os.environ.get('FEISHU_WEBHOOK', '[请配置飞书Webhook地址]')
 
 def feishu_send(title, content):
     """发送消息到飞书群"""
@@ -254,6 +410,12 @@ from workflow.torrent import (
     torrent_search, torrent_guess_en, build_search_term,
     set_api_key_provider, set_progress_callback, set_cancel_check, cancel_search_activity,
 )
+from workflow.ai_services import (
+    set_api_keys_provider as set_ai_api_keys_provider,
+    lisp_ai_text, lisp_ai_image, lisp_ai_video, lisp_video_concat,
+    lisp_slideshow_video,
+)
+from workflow.user_errors import format_user_error
 GLOBAL_ENV['torrent-search'] = torrent_search
 GLOBAL_ENV[to_symbol('搜索种子')] = torrent_search
 GLOBAL_ENV['torrent-guess-en'] = torrent_guess_en
@@ -327,10 +489,22 @@ GLOBAL_ENV[to_symbol('读取历史')] = load_search_history
 GLOBAL_ENV['save-history'] = save_search_history
 GLOBAL_ENV[to_symbol('保存历史')] = save_search_history
 
+GLOBAL_ENV['ai-text'] = lisp_ai_text
+GLOBAL_ENV[to_symbol('AI文本')] = lisp_ai_text
+GLOBAL_ENV['ai-image'] = lisp_ai_image
+GLOBAL_ENV[to_symbol('AI图像')] = lisp_ai_image
+GLOBAL_ENV['ai-video'] = lisp_ai_video
+GLOBAL_ENV[to_symbol('AI视频')] = lisp_ai_video
+GLOBAL_ENV['video-concat'] = lisp_video_concat
+GLOBAL_ENV[to_symbol('视频拼接')] = lisp_video_concat
+GLOBAL_ENV['slideshow-video'] = lisp_slideshow_video
+GLOBAL_ENV[to_symbol('幻灯片视频')] = lisp_slideshow_video
 
-# 初始化时加载本地配置并注入 LLM
+
+# 初始化时加载本地配置并注入 LLM / AI 服务
 _load_user_config()
-set_api_key_provider(lambda: _server_api_key or os.environ.get("DEEPSEEK_API_KEY") or os.environ.get("OPENAI_API_KEY", ""))
+set_api_key_provider(lambda: _get_merged_api_keys().get("deepseek", ""))
+set_ai_api_keys_provider(_get_merged_api_keys)
 update_llm_env()
 
 
@@ -363,12 +537,48 @@ def stream_input(prompt=""):
     return ""
 
 
+def stream_interact(prompt, options):
+    """
+    结构化交互：弹出一个选项列表（含可选 image/video 缩略图）给用户点选。
+
+    options: list of {label, value, image?, video?}
+      - label:  显示文本（如 "[1] 使用这组帧"）
+      - value:  用户选择后回传给 Lisp 的字符串
+      - image:  可选，图片 URL/路径（前端会渲染为缩略图）
+      - video:  可选，视频 URL/路径
+    """
+    session = _session_for_output()
+    if not session or session.stopped():
+        return ""
+    payload = {
+        "prompt": str(prompt).replace('\n', '↎'),
+        "options": list(options or []),
+    }
+    session.output_queue.put(f"__INTERACT__:{json.dumps(payload, ensure_ascii=False)}")
+    while not session.stopped():
+        try:
+            val = session.input_queue.get(timeout=1.0)
+            if session.stopped():
+                return ""
+            return val
+        except queue.Empty:
+            continue
+    return ""
+
+
 def _execute_code(session: ExecutionSession, code: str):
     """在独立线程中执行代码"""
     global markdown_mode
     markdown_mode = session.markdown
 
+    use_zhiyu = os.environ.get("ZHIYU_RUNTIME", "zhiyu").lower() != "legacy"
+
     try:
+        if use_zhiyu:
+            from workflow.zhiyu_runner import run_zhiyu_session
+            run_zhiyu_session(session, code)
+            return
+
         update_llm_env()
 
         GLOBAL_ENV['print'] = stream_print
@@ -376,6 +586,9 @@ def _execute_code(session: ExecutionSession, code: str):
         GLOBAL_ENV[to_symbol('输出')] = stream_print
         GLOBAL_ENV['input'] = stream_input
         GLOBAL_ENV[to_symbol('输入')] = stream_input
+        GLOBAL_ENV['interact'] = stream_interact
+        GLOBAL_ENV[to_symbol('选择')] = stream_interact
+        GLOBAL_ENV[to_symbol('交互')] = stream_interact
 
         workflow_lisp.BASE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'examples')
         workflow_lisp._loaded_files = set()
@@ -394,7 +607,7 @@ def _execute_code(session: ExecutionSession, code: str):
 
     except Exception as e:
         if not session.stopped():
-            session.output_queue.put(f"__ERROR__:{type(e).__name__}: {str(e)}")
+            session.output_queue.put(f"__ERROR__:{format_user_error(e)}")
         else:
             session.output_queue.put("__STOPPED__")
 
@@ -791,17 +1004,14 @@ class Handler(BaseHTTPRequestHandler):
         elif self.path.startswith('/static/'):
             _serve_static_file(self, self.path[len('/static/'):])
         elif self.path == '/api/status':
+            merged = _get_merged_api_keys()
             self.send_json({
                 "status": "ok",
-                "api_key_set": bool(_server_api_key or os.environ.get("DEEPSEEK_API_KEY") or os.environ.get("OPENAI_API_KEY")),
+                "api_key_set": bool(merged.get("deepseek")),
                 "aria2": _ARIA2_AVAILABLE,
             })
         elif self.path == '/api/config':
-            # 只返回 key 是否已设置，不返回 key 本身
-            self.send_json({
-                "api_key_set": bool(_server_api_key),
-                "masked_key": (_server_api_key[:4] + "****" + _server_api_key[-4:]) if len(_server_api_key) > 8 else ("****" if _server_api_key else "")
-            })
+            self.send_json(_config_api_keys_response())
         elif self.path == '/api/files':
             examples_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'examples')
             def build_tree(dir_path):
@@ -826,6 +1036,60 @@ class Handler(BaseHTTPRequestHandler):
                     self.send_json({"name": name, "content": f.read()})
             else:
                 self.send_error(404)
+        elif self.path == '/api/ai/uploads':
+            upload_root = os.path.normpath(os.path.join(_BASE_DIR, '.ark', 'uploads'))
+            items = []
+            if os.path.isdir(upload_root):
+                for name in sorted(os.listdir(upload_root), reverse=True):
+                    full = os.path.join(upload_root, name)
+                    if not os.path.isfile(full):
+                        continue
+                    rel = os.path.relpath(full, _BASE_DIR)
+                    items.append({
+                        "name": name,
+                        "path": rel,
+                        "size": os.path.getsize(full),
+                        "mtime": int(os.path.getmtime(full)),
+                    })
+            self.send_json({"status": "ok", "uploads": items})
+            return
+        elif self.path == '/api/ai/uploads/serve':
+            qs = parse_qs(urlparse(self.path).query)
+            rel = (qs.get('path', [''])[0] or '').strip()
+            full = os.path.normpath(os.path.join(_BASE_DIR, rel)) if rel else ''
+            upload_root = os.path.normpath(os.path.join(_BASE_DIR, '.ark', 'uploads'))
+            if full and full.startswith(upload_root) and os.path.isfile(full):
+                ext = os.path.splitext(full)[1].lower()
+                mime = {'.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png', '.webp': 'image/webp'}.get(ext, 'application/octet-stream')
+                with open(full, 'rb') as f:
+                    data = f.read()
+                self.send_response(200)
+                self.send_header('Content-Type', mime)
+                self.send_header('Content-Length', str(len(data)))
+                self.send_header('Cache-Control', 'no-cache')
+                self.end_headers()
+                self.wfile.write(data)
+            else:
+                self.send_error(404)
+            return
+        elif self.path == '/api/ai/serve':
+            qs = parse_qs(urlparse(self.path).query)
+            rel = (qs.get('path', [''])[0] or '').strip()
+            full = os.path.normpath(os.path.join(_BASE_DIR, rel)) if rel else ''
+            ark_root = os.path.normpath(os.path.join(_BASE_DIR, '.ark'))
+            if full and full.startswith(ark_root) and os.path.isfile(full):
+                ext = os.path.splitext(full)[1].lower()
+                mime = 'video/mp4' if ext == '.mp4' else 'image/jpeg'
+                self.send_response(200)
+                self.send_header('Content-Type', mime)
+                self.send_header('Content-Length', str(os.path.getsize(full)))
+                self.send_header('Cache-Control', 'no-cache')
+                self.end_headers()
+                with open(full, 'rb') as f:
+                    self.wfile.write(f.read())
+            else:
+                self.send_error(404)
+            return
         elif urlparse(self.path).path == '/api/preview/status':
             qs = parse_qs(urlparse(self.path).query)
             magnet = unquote(qs.get('magnet', [''])[0])
@@ -838,8 +1102,6 @@ class Handler(BaseHTTPRequestHandler):
             self.send_error(404)
 
     def do_POST(self):
-        global _server_api_key
-
         content_length = int(self.headers.get('Content-Length', 0))
 
         if self.path == '/api/file/upload':
@@ -847,12 +1109,34 @@ class Handler(BaseHTTPRequestHandler):
             content_type = self.headers.get('Content-Type', '')
             env = {'REQUEST_METHOD': 'POST', 'CONTENT_TYPE': content_type, 'CONTENT_LENGTH': str(content_length)}
             form = cgi.FieldStorage(fp=self.rfile, headers=self.headers, environ=env)
-            examples_dir = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'examples'))
+            purpose = (form.getvalue('purpose') or '').strip()
             target_dir = form.getvalue('dir', '') or ''
             uploaded = []
             file_items = form['files'] if 'files' in form else []
             if not isinstance(file_items, list):
                 file_items = [file_items]
+
+            # AI 视频角色图：保存到 .ark/uploads/，Lisp 端通过返回的 path 直接引用
+            if purpose == 'ai_video':
+                upload_root = os.path.normpath(os.path.join(_BASE_DIR, '.ark', 'uploads'))
+                os.makedirs(upload_root, exist_ok=True)
+                for item in file_items:
+                    if not item.filename:
+                        continue
+                    ext = os.path.splitext(item.filename)[1].lower() or '.jpg'
+                    if ext not in ('.jpg', '.jpeg', '.png', '.webp'):
+                        ext = '.jpg'
+                    safe_name = f"{int(time.time())}_{uuid.uuid4().hex[:8]}{ext}"
+                    fpath = os.path.join(upload_root, safe_name)
+                    with open(fpath, 'wb') as f:
+                        f.write(item.file.read())
+                    rel = os.path.relpath(fpath, _BASE_DIR)
+                    uploaded.append(rel)
+                self.send_json({"status": "ok", "files": uploaded, "purpose": purpose})
+                return
+
+            # 默认：保存到 examples/（兼容旧行为）
+            examples_dir = os.path.normpath(os.path.join(_BASE_DIR, 'examples'))
             for item in file_items:
                 if item.filename:
                     fname = os.path.basename(item.filename)
@@ -862,7 +1146,7 @@ class Handler(BaseHTTPRequestHandler):
                         with open(fpath, 'wb') as f:
                             f.write(item.file.read())
                         uploaded.append(os.path.join(target_dir, fname) if target_dir else fname)
-            self.send_json({"status": "ok", "files": uploaded})
+            self.send_json({"status": "ok", "files": uploaded, "purpose": purpose or "examples"})
             return
 
         body = self.rfile.read(content_length).decode('utf-8')
@@ -875,10 +1159,11 @@ class Handler(BaseHTTPRequestHandler):
         if self.path == '/api/chat':
             prompt = (data.get('prompt') or data.get('message') or '').strip()
             if not prompt:
-                self.send_json({"status": "error", "message": "请提供 prompt"})
+                self.send_json({"status": "error", "message": "请提供提示词"})
                 return
             from workflow.llm import call_llm
-            key = _server_api_key or os.environ.get("DEEPSEEK_API_KEY") or os.environ.get("OPENAI_API_KEY", "")
+            merged = _get_merged_api_keys()
+            key = merged.get("deepseek", "")
             try:
                 reply = call_llm(
                     prompt,
@@ -886,95 +1171,38 @@ class Handler(BaseHTTPRequestHandler):
                 )
                 self.send_json({"status": "ok", "reply": reply})
             except Exception as e:
-                self.send_json({"status": "error", "message": str(e)})
+                self.send_json({"status": "error", "message": format_user_error(e)})
 
         elif self.path == '/api/config':
-            # 设置 API Key
+            provider = (data.get('provider') or 'deepseek').strip().lower()
+
+            # 可灵特殊：支持拆分 Access Key / Secret Key 两字段
+            if provider == 'kling':
+                self._handle_kling_config(data)
+                return
+
             new_key = (data.get('api_key') or '').strip()
-            if new_key:
-                _server_api_key = new_key
-                _save_user_config_api_key(new_key)
+
+            if data.get('clear'):
+                _clear_provider_api_key(provider)
+                set_api_key_provider(lambda: _get_merged_api_keys().get("deepseek", ""))
+                set_ai_api_keys_provider(_get_merged_api_keys)
                 update_llm_env()
-                print(f"[HTTP] API Key 已更新 ({new_key[:4]}****{new_key[-4:] if len(new_key)>8 else ''})")
-                self.send_json({"status": "ok", "message": "API Key 已设置"})
-            elif data.get('clear'):
-                _server_api_key = ""
-                _clear_user_config_api_key()
+                print(f"[HTTP] 已清除 {provider} API 密钥")
+                self.send_json({"status": "ok", "message": f"{provider} API 密钥已清除"})
+            elif new_key:
+                _save_provider_api_key(provider, new_key)
+                set_api_key_provider(lambda: _get_merged_api_keys().get("deepseek", ""))
+                set_ai_api_keys_provider(_get_merged_api_keys)
                 update_llm_env()
-                print("[HTTP] API Key 已清除")
-                self.send_json({"status": "ok", "message": "API Key 已清除"})
+                masked = _mask_api_key(new_key)
+                print(f"[HTTP] {provider} API 密钥已更新 ({masked})")
+                self.send_json({"status": "ok", "message": f"{provider} API 密钥已设置"})
             else:
-                self.send_json({"status": "error", "message": "请提供有效的 API Key"})
-        
+                self.send_json({"status": "error", "message": "请提供有效的 API 密钥"})
+
         elif self.path == '/api/execute':
-            client_id = str(data.get('client_id') or '').strip()
-            code = data.get('code', '')
-            is_markdown = data.get('markdown', False)
-
-            session = _start_execution(client_id, code, is_markdown)
-
-            self.send_response(200)
-            self.send_header('Content-type', 'text/event-stream')
-            self.send_header('Cache-Control', 'no-cache, no-transform')
-            self.send_header('Connection', 'keep-alive')
-            self.send_header('X-Accel-Buffering', 'no')
-            self.end_headers()
-
-            try:
-                self.wfile.write(f"data: __SESSION__:{session.id}\n\n".encode())
-                self.wfile.flush()
-
-                while True:
-                    if session.stopped() and session.output_queue.empty():
-                        try:
-                            self.wfile.write(b"data: __STOPPED__\n\n")
-                            self.wfile.flush()
-                        except Exception:
-                            pass
-                        break
-                    try:
-                        msg = session.output_queue.get(timeout=1.0)
-
-                        if msg in ("__DONE__", "__STOPPED__"):
-                            self.wfile.write(f"data: {msg}\n\n".encode())
-                            self.wfile.flush()
-                            break
-                        if msg.startswith("__ERROR__:"):
-                            self.wfile.write(f"data: {msg}\n\n".encode())
-                            self.wfile.flush()
-                            break
-                        self.wfile.write(f"data: {msg}\n\n".encode())
-                        self.wfile.flush()
-
-                    except queue.Empty:
-                        active = _get_active_session()
-                        if active is not session:
-                            try:
-                                self.wfile.write(b"data: __STOPPED__\n\n")
-                                self.wfile.flush()
-                            except Exception:
-                                pass
-                            break
-                        if session.thread and not session.thread.is_alive():
-                            if session.output_queue.empty():
-                                try:
-                                    self.wfile.write(b"data: __DONE__\n\n")
-                                    self.wfile.flush()
-                                except Exception:
-                                    pass
-                                break
-                        try:
-                            self.wfile.write(b": keepalive\n\n")
-                            self.wfile.flush()
-                        except Exception:
-                            break
-
-            except Exception as e:
-                try:
-                    self.wfile.write(f"data: __ERROR__:{str(e)}\n\n".encode())
-                    self.wfile.flush()
-                except Exception:
-                    pass
+            self._handle_execute(data)
 
         elif self.path == '/api/stop':
             client_id = str(data.get('client_id') or '').strip()
@@ -1010,43 +1238,51 @@ class Handler(BaseHTTPRequestHandler):
                     os.makedirs(os.path.dirname(fpath), exist_ok=True)
                     with open(fpath, 'w', encoding='utf-8') as f:
                         f.write(content)
+                    active = _get_active_session()
+                    if active and os.environ.get("ZHIYU_RUNTIME", "zhiyu").lower() != "legacy":
+                        try:
+                            from workflow.zhiyu_runner import reload_zhiyu_file
+                            rel = os.path.relpath(fpath, examples_dir)
+                            reload_zhiyu_file(active, rel)
+                        except Exception:
+                            pass
                     self.send_json({"status": "ok"})
                 else:
-                    self.send_json({"status": "error", "message": "Invalid path"})
+                    self.send_json({"status": "error", "message": "路径无效"})
             else:
-                self.send_json({"status": "error", "message": "Invalid filename"})
+                self.send_json({"status": "error", "message": "文件名无效"})
 
         elif self.path == '/api/file/create':
             name = data.get('name', '')
             if not name:
-                self.send_json({"status": "error", "message": "Empty name"})
+                self.send_json({"status": "error", "message": "名称不能为空"})
                 return
             examples_dir = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'examples'))
             fpath = os.path.normpath(os.path.join(examples_dir, name))
             if not fpath.startswith(examples_dir):
-                self.send_json({"status": "error", "message": "Invalid path"})
+                self.send_json({"status": "error", "message": "路径无效"})
             elif not os.path.exists(fpath):
                 os.makedirs(os.path.dirname(fpath), exist_ok=True)
                 with open(fpath, 'w', encoding='utf-8') as f:
                     f.write('')
                 self.send_json({"status": "ok", "name": name})
             else:
-                self.send_json({"status": "error", "message": "File already exists"})
+                self.send_json({"status": "error", "message": "文件已存在"})
 
         elif self.path == '/api/dir/create':
             name = data.get('name', '')
             if not name:
-                self.send_json({"status": "error", "message": "Empty name"})
+                self.send_json({"status": "error", "message": "名称不能为空"})
                 return
             examples_dir = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'examples'))
             dpath = os.path.normpath(os.path.join(examples_dir, name))
             if not dpath.startswith(examples_dir):
-                self.send_json({"status": "error", "message": "Invalid path"})
+                self.send_json({"status": "error", "message": "路径无效"})
             elif not os.path.exists(dpath):
                 os.makedirs(dpath)
                 self.send_json({"status": "ok"})
             else:
-                self.send_json({"status": "error", "message": "Directory already exists"})
+                self.send_json({"status": "error", "message": "文件夹已存在"})
 
         elif self.path == '/api/file/delete':
             name = data.get('name', '')
@@ -1060,7 +1296,7 @@ class Handler(BaseHTTPRequestHandler):
                     shutil.rmtree(fpath)
                 self.send_json({"status": "ok"})
             else:
-                self.send_json({"status": "error", "message": "File not found"})
+                self.send_json({"status": "error", "message": "文件未找到"})
 
         elif self.path == '/api/file/rename':
             old_name = data.get('old', '')
@@ -1069,11 +1305,11 @@ class Handler(BaseHTTPRequestHandler):
             old_path = os.path.normpath(os.path.join(examples_dir, old_name))
             new_path = os.path.normpath(os.path.join(examples_dir, new_name))
             if not old_path.startswith(examples_dir) or not new_path.startswith(examples_dir):
-                self.send_json({"status": "error", "message": "Invalid path"})
+                self.send_json({"status": "error", "message": "路径无效"})
             elif not os.path.exists(old_path):
-                self.send_json({"status": "error", "message": "Source not found"})
+                self.send_json({"status": "error", "message": "源文件未找到"})
             elif os.path.exists(new_path):
-                self.send_json({"status": "error", "message": "Target already exists"})
+                self.send_json({"status": "error", "message": "目标已存在"})
             else:
                 os.makedirs(os.path.dirname(new_path), exist_ok=True)
                 os.rename(old_path, new_path)
@@ -1085,7 +1321,7 @@ class Handler(BaseHTTPRequestHandler):
             examples_dir = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'examples'))
             src_path = os.path.normpath(os.path.join(examples_dir, name))
             if not src_path.startswith(examples_dir) or not os.path.exists(src_path):
-                self.send_json({"status": "error", "message": "File not found"})
+                self.send_json({"status": "error", "message": "文件未找到"})
             else:
                 base, ext = os.path.splitext(src_path)
                 copy_path = base + "_副本" + ext
@@ -1100,12 +1336,84 @@ class Handler(BaseHTTPRequestHandler):
                 rel = os.path.relpath(copy_path, examples_dir)
                 self.send_json({"status": "ok", "name": rel})
 
+    def _handle_execute(self, data):
+        """处理 /api/execute 请求"""
+        client_id = str(data.get('client_id') or '').strip()
+        code = data.get('code', '')
+        is_markdown = data.get('markdown', False)
+        inputs = data.get('inputs') if isinstance(data.get('inputs'), dict) else None
+
+        session = _start_execution(client_id, code, is_markdown, inputs=inputs)
+
+        self.send_response(200)
+        self.send_header('Content-type', 'text/event-stream')
+        self.send_header('Cache-Control', 'no-cache, no-transform')
+        self.send_header('Connection', 'keep-alive')
+        self.send_header('X-Accel-Buffering', 'no')
+        self.end_headers()
+
+        try:
+            self.wfile.write(f"data: __SESSION__:{session.id}\n\n".encode())
+            self.wfile.flush()
+
+            while True:
+                if session.stopped() and session.output_queue.empty():
+                    try:
+                        self.wfile.write(b"data: __STOPPED__\n\n")
+                        self.wfile.flush()
+                    except Exception:
+                        pass
+                    break
+                try:
+                    msg = session.output_queue.get(timeout=1.0)
+
+                    if msg in ("__DONE__", "__STOPPED__"):
+                        self.wfile.write(f"data: {msg}\n\n".encode())
+                        self.wfile.flush()
+                        break
+                    if msg.startswith("__ERROR__:"):
+                        self.wfile.write(f"data: {msg}\n\n".encode())
+                        self.wfile.flush()
+                        break
+                    self.wfile.write(f"data: {msg}\n\n".encode())
+                    self.wfile.flush()
+
+                except queue.Empty:
+                    active = _get_active_session()
+                    if active is not session:
+                        try:
+                            self.wfile.write(b"data: __STOPPED__\n\n")
+                            self.wfile.flush()
+                        except Exception:
+                            pass
+                        break
+                    if session.thread and not session.thread.is_alive():
+                        if session.output_queue.empty():
+                            try:
+                                self.wfile.write(b"data: __DONE__\n\n")
+                                self.wfile.flush()
+                            except Exception:
+                                pass
+                            break
+                    try:
+                        self.wfile.write(b": keepalive\n\n")
+                        self.wfile.flush()
+                    except Exception:
+                        break
+
+        except Exception as e:
+            try:
+                self.wfile.write(f"data: __ERROR__:{format_user_error(e)}\n\n".encode())
+                self.wfile.flush()
+            except Exception:
+                pass
+
     def send_json(self, data):
         self.send_response(200)
         self.send_header('Content-type', 'application/json')
         self.end_headers()
         self.wfile.write(json.dumps(data).encode())
-    
+
     def log_message(self, format, *args):
         print(f"[HTTP] {args[0]}")
 
@@ -1115,7 +1423,7 @@ class Handler(BaseHTTPRequestHandler):
 def main():
     port = 8080
     print("=" * 50)
-    print("Lisp Workflow Web 界面")
+    print("Lisp 工作流 Web 界面")
     print("=" * 50)
     if not _ARIA2_AVAILABLE:
         print(_ARIA2_HINT)
